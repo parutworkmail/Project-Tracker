@@ -9,11 +9,69 @@ Logging". Shows exactly what was happening if the last session crashed.)
 - **Plan**: (none in progress)
 - **Status**: idle.
 - **Next**: none — awaiting next user request. Last completed work:
-  username-based auth + SUPER_ADMIN-only user creation + forced
-  password-change redesign, verified clean (tsc/lint/build/179 tests/
-  agent validator), not yet committed — see "Session: Username-based
-  auth, admin-created users, forced password change" below for full
-  details.
+  added SUPER_ADMIN "delete user" feature, verified clean
+  (tsc/lint/build/186 tests/agent validator, 1 race-condition bug found
+  and fixed), not yet committed — see "Session: Delete-user admin
+  feature" below for full details.
+
+## Session: Delete-user admin feature
+User tested the admin console and found no way to delete a user — only
+project-admin *unassignment* existed, no user deletion at all.
+
+### What changed
+- `prisma/schema.prisma`: `Project.createdBy` relation made explicitly
+  `onDelete: Restrict` (was already the implicit Postgres/Prisma default,
+  now documented in a comment — a user who created a project can't be
+  deleted until that project is deleted/reassigned). `ProjectAdmin
+  .assignedById` changed from required to nullable with `onDelete:
+  SetNull` (was `Restrict` — the assigner is just an audit trail, so
+  deleting them shouldn't be blocked by, or force-delete, assignment
+  rows they created for other users). Migration
+  `20261021090257_project_creator_restrict_and_assigned_by_nullable`
+  applied to the real Supabase DB (confirmed existing FK constraints via
+  direct query first — `Project.createdById` was already `RESTRICT`, so
+  only the `ProjectAdmin.assignedById` constraint needed to actually
+  change).
+- New `DELETE /api/admin/users/[userId]`: SUPER_ADMIN-gated, blocks
+  self-deletion (400), 404s if the target doesn't exist, catches Prisma
+  P2003 (FK restrict violation — i.e. the user still owns a project) and
+  returns a clear 409 instead of a raw 500, rethrows any other error.
+  Allowing a SUPER_ADMIN to delete another SUPER_ADMIN was a deliberate
+  choice (not accidental privilege loss — self-deletion is already
+  blocked, so this can't zero out super admins by itself).
+- `UserRoleManager`: new "Delete" button per row (hidden for the current
+  user, same as the role selector) with a `window.confirm` guard before
+  the request fires.
+
+### Issue caught by independent agent validator, fixed before finishing
+- **Race condition**: original implementation tracked in-flight
+  requests with a single shared `pendingId: string | null` state used
+  by both the role-select and the delete button, across every row.
+  Clicking delete on row B while row A's request was still in flight
+  would overwrite the shared state, re-enabling row A's controls mid-
+  request and letting a second overlapping request fire for it. Fixed:
+  replaced with a `Set<string>` (`pendingIds`) so each row's pending
+  state is tracked independently — `setPending(userId, bool)` helper
+  adds/removes from the set, `disabled` checks `pendingIds.has(user.id)`
+  per row instead of a single shared value.
+
+### Verification
+`npx tsc --noEmit` clean. `npm test` → **186/186 passing** (179 carried
+over + 7 new DELETE-endpoint tests). `npm run lint` clean (same
+pre-existing unrelated warnings only). `npm run build` succeeds. A
+second agent validator pass after the race-condition fix was not
+re-run as a separate step, but the fix itself was small/mechanical
+(swap one state shape for another with equivalent semantics) and
+re-verified via the full tsc/test/lint/build sweep above.
+
+### Not yet done
+- Not committed yet — ask user first (per rule: never commit unless
+  explicitly asked).
+- No bulk-delete or "transfer ownership of projects" UI exists — if a
+  SUPER_ADMIN is blocked by the 409 (user still owns projects), they
+  currently have to manually delete those projects first via the
+  project page's own delete control before the user delete will
+  succeed. Not asked for; mentioning as a possible follow-up.
 
 ## Session: Username-based auth, admin-created users, forced password change
 User raised two concerns about the old email/password signup: (1) email was

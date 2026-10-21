@@ -77,16 +77,19 @@ model VerificationToken {
 }
 
 model Project {
-  id         String          @id @default(cuid())
-  name       String
-  slug       String          @unique
-  schemaName String          @unique
+  id          String          @id @default(cuid())
+  name        String
+  slug        String          @unique
+  schemaName  String          @unique
   createdById String
-  createdBy  User            @relation("ProjectCreator", fields: [createdById], references: [id])
-  members    ProjectMember[]
-  admins     ProjectAdmin[]
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  // Restrict (default): a user who created a project can't be deleted
+  // until that project is deleted/reassigned first. Explicit here so
+  // it's a deliberate choice, not an accidental default.
+  createdBy   User            @relation("ProjectCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  members     ProjectMember[]
+  admins      ProjectAdmin[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 }
 
 model ProjectMember {
@@ -102,15 +105,18 @@ model ProjectMember {
 }
 
 model ProjectAdmin {
-  id         String   @id @default(cuid())
-  projectId  String
-  userId     String
-  assignedById String
-  createdAt  DateTime @default(now())
+  id           String   @id @default(cuid())
+  projectId    String
+  userId       String
+  // Nullable + SetNull: the assigner is an audit trail, not a hard
+  // dependency — deleting them should not block deleting this
+  // assignment's own target user, nor force deleting the assignment.
+  assignedById String?
+  createdAt    DateTime @default(now())
 
   project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user       User    @relation("ProjectAdminUser", fields: [userId], references: [id], onDelete: Cascade)
-  assignedBy User    @relation("ProjectAdminAssignedBy", fields: [assignedById], references: [id])
+  assignedBy User?   @relation("ProjectAdminAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
 
   @@unique([projectId, userId])
 }

@@ -23,11 +23,23 @@ export function UserRoleManager({
   currentUserId: string;
 }) {
   const router = useRouter();
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
 
+  function setPending(userId: string, pending: boolean) {
+    setPendingIds((prev) => {
+      const next = new Set(prev);
+      if (pending) {
+        next.add(userId);
+      } else {
+        next.delete(userId);
+      }
+      return next;
+    });
+  }
+
   async function changeRole(userId: string, role: Role) {
-    setPendingId(userId);
+    setPending(userId, true);
     setError(null);
 
     const res = await fetch(`/api/admin/users/${userId}`, {
@@ -41,11 +53,40 @@ export function UserRoleManager({
       setError(
         typeof body?.error === "string" ? body.error : "Role change failed."
       );
-      setPendingId(null);
+      setPending(userId, false);
       return;
     }
 
-    setPendingId(null);
+    setPending(userId, false);
+    router.refresh();
+  }
+
+  async function deleteUser(userId: string, username: string) {
+    if (
+      !window.confirm(
+        `Delete user "${username}"? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    setPending(userId, true);
+    setError(null);
+
+    const res = await fetch(`/api/admin/users/${userId}`, {
+      method: "DELETE",
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      setError(
+        typeof body?.error === "string" ? body.error : "Delete failed."
+      );
+      setPending(userId, false);
+      return;
+    }
+
+    setPending(userId, false);
     router.refresh();
   }
 
@@ -59,6 +100,7 @@ export function UserRoleManager({
             <th className="py-2">Name</th>
             <th className="py-2">Email</th>
             <th className="py-2">Role</th>
+            <th className="py-2"></th>
           </tr>
         </thead>
         <tbody>
@@ -76,7 +118,7 @@ export function UserRoleManager({
                 ) : (
                   <select
                     value={user.role}
-                    disabled={pendingId === user.id}
+                    disabled={pendingIds.has(user.id)}
                     onChange={(e) =>
                       changeRole(user.id, e.target.value as Role)
                     }
@@ -88,6 +130,18 @@ export function UserRoleManager({
                       </option>
                     ))}
                   </select>
+                )}
+              </td>
+              <td className="py-2 text-right">
+                {user.id !== currentUserId && (
+                  <button
+                    type="button"
+                    disabled={pendingIds.has(user.id)}
+                    onClick={() => deleteUser(user.id, user.username)}
+                    className="rounded border border-red-600 px-2 py-1 text-xs text-red-600 disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
                 )}
               </td>
             </tr>
