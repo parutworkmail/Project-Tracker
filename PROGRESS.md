@@ -9,10 +9,7 @@ Logging". Shows exactly what was happening if the last session crashed.)
 - **Plan**: (none in progress)
 - **Status**: idle.
 - **Next**: none — awaiting next user request. Last completed work:
-  added SUPER_ADMIN "delete user" feature, verified clean
-  (tsc/lint/build/186 tests/agent validator, 1 race-condition bug found
-  and fixed), not yet committed — see "Session: Delete-user admin
-  feature" below for full details.
+  SUPER_ADMIN "delete user" feature, committed `46580e7` on `main`.
 
 ## Session: Delete-user admin feature
 User tested the admin console and found no way to delete a user — only
