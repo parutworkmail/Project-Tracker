@@ -2,15 +2,32 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
+
+const JOIN_LIMIT = 20;
+const JOIN_WINDOW_MS = 60 * 60 * 1000;
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const session = await auth();
 
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const ip = getClientIp(request);
+  const rateLimit = await checkRateLimit(`join:${ip}`, JOIN_LIMIT, JOIN_WINDOW_MS);
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many join attempts. Please try again later." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil(rateLimit.retryAfterMs / 1000)) },
+      }
+    );
   }
 
   const { slug } = await params;

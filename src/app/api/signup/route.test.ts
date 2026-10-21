@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { userCreate } = vi.hoisted(() => ({ userCreate: vi.fn() }));
+const { userCreate, checkRateLimit } = vi.hoisted(() => ({
+  userCreate: vi.fn(),
+  checkRateLimit: vi.fn(),
+}));
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -8,6 +11,11 @@ vi.mock("@/lib/prisma", () => ({
       create: userCreate,
     },
   },
+}));
+
+vi.mock("@/lib/rateLimit", () => ({
+  checkRateLimit,
+  getClientIp: () => "127.0.0.1",
 }));
 
 import { Prisma } from "@/generated/prisma/client";
@@ -32,6 +40,22 @@ function malformedRequest() {
 describe("POST /api/signup", () => {
   beforeEach(() => {
     userCreate.mockReset();
+    checkRateLimit.mockReset();
+    checkRateLimit.mockResolvedValue({ allowed: true, retryAfterMs: 0 });
+  });
+
+  it("returns 429 with Retry-After when the IP has exceeded the signup rate limit", async () => {
+    checkRateLimit.mockResolvedValue({ allowed: false, retryAfterMs: 30_000 });
+
+    const response = await POST(
+      jsonRequest({ email: "jane@example.com", password: "password123" })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(typeof body.error).toBe("string");
+    expect(response.headers.get("Retry-After")).toBe("30");
+    expect(userCreate).not.toHaveBeenCalled();
   });
 
   it("returns 400 with {error: string} on malformed JSON body", async () => {

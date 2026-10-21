@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authMock, projectFindUnique, projectMemberUpsert } = vi.hoisted(
+const { authMock, projectFindUnique, projectMemberUpsert, checkRateLimit } = vi.hoisted(
   () => ({
     authMock: vi.fn(),
     projectFindUnique: vi.fn(),
     projectMemberUpsert: vi.fn(),
+    checkRateLimit: vi.fn(),
   })
 );
 
@@ -15,6 +16,11 @@ vi.mock("@/lib/prisma", () => ({
     project: { findUnique: projectFindUnique },
     projectMember: { upsert: projectMemberUpsert },
   },
+}));
+
+vi.mock("@/lib/rateLimit", () => ({
+  checkRateLimit,
+  getClientIp: () => "127.0.0.1",
 }));
 
 import { POST } from "./route";
@@ -28,6 +34,21 @@ describe("POST /api/projects/[slug]/join", () => {
     authMock.mockReset();
     projectFindUnique.mockReset();
     projectMemberUpsert.mockReset();
+    checkRateLimit.mockReset();
+    checkRateLimit.mockResolvedValue({ allowed: true, retryAfterMs: 0 });
+  });
+
+  it("returns 429 with Retry-After when the IP has exceeded the join rate limit", async () => {
+    authMock.mockResolvedValue({ user: { id: "user-1" } });
+    checkRateLimit.mockResolvedValue({ allowed: false, retryAfterMs: 45_000 });
+
+    const response = await POST(new Request("http://localhost"), params("x"));
+    const body = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(typeof body.error).toBe("string");
+    expect(response.headers.get("Retry-After")).toBe("45");
+    expect(projectMemberUpsert).not.toHaveBeenCalled();
   });
 
   it("returns 401 when there is no session", async () => {

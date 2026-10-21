@@ -2,14 +2,24 @@ import bcrypt from "bcryptjs";
 
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validation/auth";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export const MAX_FAILED_ATTEMPTS = 5;
 export const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+export const LOGIN_IP_LIMIT = 10;
+export const LOGIN_IP_WINDOW_MS = 15 * 60 * 1000;
 
 export class AccountLockedError extends Error {
   constructor() {
     super("AccountLocked");
     this.name = "AccountLockedError";
+  }
+}
+
+export class RateLimitedError extends Error {
+  constructor() {
+    super("RateLimited");
+    this.name = "RateLimitedError";
   }
 }
 
@@ -21,8 +31,19 @@ export interface AuthorizedUser {
 }
 
 export async function authenticateCredentials(
-  credentials: Record<string, unknown>
+  credentials: Record<string, unknown>,
+  ip: string
 ): Promise<AuthorizedUser | null> {
+  const rateLimit = await checkRateLimit(
+    `login:${ip}`,
+    LOGIN_IP_LIMIT,
+    LOGIN_IP_WINDOW_MS
+  );
+
+  if (!rateLimit.allowed) {
+    throw new RateLimitedError();
+  }
+
   const parsed = loginSchema.safeParse(credentials);
 
   if (!parsed.success) {

@@ -4,10 +4,15 @@ import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 
 import { prisma } from "@/lib/prisma";
-import { authenticateCredentials, AccountLockedError } from "@/lib/auth/credentials";
+import { authenticateCredentials, AccountLockedError, RateLimitedError } from "@/lib/auth/credentials";
+import { getClientIp } from "@/lib/rateLimit";
 
 class AccountLockedSignInError extends CredentialsSignin {
   code = "account-locked";
+}
+
+class RateLimitedSignInError extends CredentialsSignin {
+  code = "rate-limited";
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -40,12 +45,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         email: {},
         password: {},
       },
-      authorize: async (credentials) => {
+      authorize: async (credentials, request) => {
         try {
-          return await authenticateCredentials(credentials);
+          return await authenticateCredentials(credentials, getClientIp(request));
         } catch (error) {
           if (error instanceof AccountLockedError) {
             throw new AccountLockedSignInError();
+          }
+          if (error instanceof RateLimitedError) {
+            throw new RateLimitedSignInError();
           }
           throw error;
         }

@@ -5,6 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { buildUniqueSlug } from "@/lib/slug";
 import { generateSchemaName, provisionProjectSchema } from "@/lib/projectSchema";
 import { createProjectSchema } from "@/lib/validation/project";
+import { checkRateLimit } from "@/lib/rateLimit";
+
+const CREATE_PROJECT_LIMIT = 10;
+const CREATE_PROJECT_WINDOW_MS = 60 * 60 * 1000;
 
 export async function GET() {
   const session = await auth();
@@ -34,6 +38,22 @@ export async function POST(request: Request) {
 
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const rateLimit = await checkRateLimit(
+    `create-project:${session.user.id}`,
+    CREATE_PROJECT_LIMIT,
+    CREATE_PROJECT_WINDOW_MS
+  );
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many projects created. Please try again later." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil(rateLimit.retryAfterMs / 1000)) },
+      }
+    );
   }
 
   const body = await request.json();

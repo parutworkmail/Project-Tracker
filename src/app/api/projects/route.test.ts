@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authMock, projectMemberFindMany, projectCreate, provisionProjectSchema } =
+const { authMock, projectMemberFindMany, projectCreate, provisionProjectSchema, checkRateLimit } =
   vi.hoisted(() => ({
     authMock: vi.fn(),
     projectMemberFindMany: vi.fn(),
     projectCreate: vi.fn(),
     provisionProjectSchema: vi.fn(),
+    checkRateLimit: vi.fn(),
   }));
 
 vi.mock("@/auth", () => ({ auth: authMock }));
@@ -15,6 +16,10 @@ vi.mock("@/lib/prisma", () => ({
     projectMember: { findMany: projectMemberFindMany },
     project: { create: projectCreate },
   },
+}));
+
+vi.mock("@/lib/rateLimit", () => ({
+  checkRateLimit,
 }));
 
 vi.mock("@/lib/projectSchema", async () => {
@@ -80,6 +85,21 @@ describe("POST /api/projects", () => {
     projectCreate.mockReset();
     provisionProjectSchema.mockReset();
     provisionProjectSchema.mockResolvedValue(undefined);
+    checkRateLimit.mockReset();
+    checkRateLimit.mockResolvedValue({ allowed: true, retryAfterMs: 0 });
+  });
+
+  it("returns 429 with Retry-After when the user has exceeded the create-project rate limit", async () => {
+    authMock.mockResolvedValue({ user: { id: "user-1" } });
+    checkRateLimit.mockResolvedValue({ allowed: false, retryAfterMs: 120_000 });
+
+    const response = await POST(jsonRequest({ name: "New Project" }));
+    const body = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(typeof body.error).toBe("string");
+    expect(response.headers.get("Retry-After")).toBe("120");
+    expect(provisionProjectSchema).not.toHaveBeenCalled();
   });
 
   it("returns 401 when there is no session", async () => {

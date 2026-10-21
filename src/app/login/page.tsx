@@ -41,11 +41,15 @@ function LoginForm() {
     });
 
     if (result?.error) {
-      setFormError(
-        result.code === "account-locked"
-          ? "Too many failed attempts. This account is temporarily locked — try again in 15 minutes."
-          : "Invalid email or password."
-      );
+      if (result.code === "account-locked") {
+        setFormError(
+          "Too many failed attempts. This account is temporarily locked — try again in 15 minutes."
+        );
+      } else if (result.code === "rate-limited") {
+        setFormError("Too many login attempts. Please try again later.");
+      } else {
+        setFormError("Invalid email or password.");
+      }
       return;
     }
 

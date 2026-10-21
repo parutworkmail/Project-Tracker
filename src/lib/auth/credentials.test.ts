@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import bcrypt from "bcryptjs";
 
-const { userFindUnique, userUpdate } = vi.hoisted(() => ({
+const { userFindUnique, userUpdate, checkRateLimit } = vi.hoisted(() => ({
   userFindUnique: vi.fn(),
   userUpdate: vi.fn(),
+  checkRateLimit: vi.fn(),
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -15,11 +16,18 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
+vi.mock("@/lib/rateLimit", () => ({
+  checkRateLimit,
+}));
+
 import {
   AccountLockedError,
+  RateLimitedError,
   MAX_FAILED_ATTEMPTS,
   authenticateCredentials,
 } from "./credentials";
+
+const IP = "127.0.0.1";
 
 function makeUser(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -38,13 +46,15 @@ describe("authenticateCredentials", () => {
   beforeEach(() => {
     userFindUnique.mockReset();
     userUpdate.mockReset();
+    checkRateLimit.mockReset();
+    checkRateLimit.mockResolvedValue({ allowed: true, retryAfterMs: 0 });
   });
 
   it("returns null for an invalid payload (bad email format)", async () => {
-    const result = await authenticateCredentials({
-      email: "not-an-email",
-      password: "x",
-    });
+    const result = await authenticateCredentials(
+      { email: "not-an-email", password: "x" },
+      IP
+    );
 
     expect(result).toBeNull();
     expect(userFindUnique).not.toHaveBeenCalled();
@@ -53,10 +63,10 @@ describe("authenticateCredentials", () => {
   it("returns null when the user doesn't exist", async () => {
     userFindUnique.mockResolvedValue(null);
 
-    const result = await authenticateCredentials({
-      email: "jane@example.com",
-      password: "password123",
-    });
+    const result = await authenticateCredentials(
+      { email: "jane@example.com", password: "password123" },
+      IP
+    );
 
     expect(result).toBeNull();
   });
@@ -64,12 +74,25 @@ describe("authenticateCredentials", () => {
   it("returns null when the user has no password set (OAuth-only account)", async () => {
     userFindUnique.mockResolvedValue(makeUser({ password: null }));
 
-    const result = await authenticateCredentials({
-      email: "jane@example.com",
-      password: "password123",
-    });
+    const result = await authenticateCredentials(
+      { email: "jane@example.com", password: "password123" },
+      IP
+    );
 
     expect(result).toBeNull();
+  });
+
+  it("throws RateLimitedError when the IP has exceeded the login rate limit", async () => {
+    checkRateLimit.mockResolvedValue({ allowed: false, retryAfterMs: 60_000 });
+
+    await expect(
+      authenticateCredentials(
+        { email: "jane@example.com", password: "password123" },
+        IP
+      )
+    ).rejects.toThrow(RateLimitedError);
+
+    expect(userFindUnique).not.toHaveBeenCalled();
   });
 
   it("throws AccountLockedError immediately when lockedUntil is in the future", async () => {
@@ -78,10 +101,10 @@ describe("authenticateCredentials", () => {
     );
 
     await expect(
-      authenticateCredentials({
-        email: "jane@example.com",
-        password: "password123",
-      })
+      authenticateCredentials(
+        { email: "jane@example.com", password: "password123" },
+        IP
+      )
     ).rejects.toThrow(AccountLockedError);
 
     expect(userUpdate).not.toHaveBeenCalled();
@@ -98,10 +121,10 @@ describe("authenticateCredentials", () => {
     );
     userUpdate.mockResolvedValue({});
 
-    const result = await authenticateCredentials({
-      email: "jane@example.com",
-      password: "password123",
-    });
+    const result = await authenticateCredentials(
+      { email: "jane@example.com", password: "password123" },
+      IP
+    );
 
     expect(result).toEqual({
       id: "user-1",
@@ -122,10 +145,10 @@ describe("authenticateCredentials", () => {
     );
     userUpdate.mockResolvedValue({});
 
-    const result = await authenticateCredentials({
-      email: "jane@example.com",
-      password: "wrong-password",
-    });
+    const result = await authenticateCredentials(
+      { email: "jane@example.com", password: "wrong-password" },
+      IP
+    );
 
     expect(result).toBeNull();
     expect(userUpdate).toHaveBeenCalledWith({
@@ -145,10 +168,10 @@ describe("authenticateCredentials", () => {
     userUpdate.mockResolvedValue({});
 
     await expect(
-      authenticateCredentials({
-        email: "jane@example.com",
-        password: "wrong-password",
-      })
+      authenticateCredentials(
+        { email: "jane@example.com", password: "wrong-password" },
+        IP
+      )
     ).rejects.toThrow(AccountLockedError);
 
     const updateArgs = userUpdate.mock.calls[0][0];
@@ -164,10 +187,10 @@ describe("authenticateCredentials", () => {
     );
     userUpdate.mockResolvedValue({});
 
-    const result = await authenticateCredentials({
-      email: "jane@example.com",
-      password: "correct-password",
-    });
+    const result = await authenticateCredentials(
+      { email: "jane@example.com", password: "correct-password" },
+      IP
+    );
 
     expect(result).not.toBeNull();
     expect(userUpdate).toHaveBeenCalledWith({
@@ -180,10 +203,10 @@ describe("authenticateCredentials", () => {
     const hash = await bcrypt.hash("correct-password", 4);
     userFindUnique.mockResolvedValue(makeUser({ password: hash }));
 
-    const result = await authenticateCredentials({
-      email: "jane@example.com",
-      password: "correct-password",
-    });
+    const result = await authenticateCredentials(
+      { email: "jane@example.com", password: "correct-password" },
+      IP
+    );
 
     expect(result).not.toBeNull();
     expect(userUpdate).not.toHaveBeenCalled();

@@ -94,3 +94,9 @@ model ProjectMember {
 
   @@unique([projectId, userId])
 }
+
+model RateLimitEntry {
+  key     String   @id
+  count   Int      @default(1)
+  resetAt DateTime
+}

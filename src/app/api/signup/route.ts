@@ -4,8 +4,25 @@ import { Prisma } from "@/generated/prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { signupSchema } from "@/lib/validation/auth";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
+
+const SIGNUP_LIMIT = 5;
+const SIGNUP_WINDOW_MS = 15 * 60 * 1000;
 
 export async function POST(request: Request) {
+  const ip = getClientIp(request);
+  const rateLimit = await checkRateLimit(`signup:${ip}`, SIGNUP_LIMIT, SIGNUP_WINDOW_MS);
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many signup attempts. Please try again later." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil(rateLimit.retryAfterMs / 1000)) },
+      }
+    );
+  }
+
   let body: unknown;
 
   try {

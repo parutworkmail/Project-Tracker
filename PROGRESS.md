@@ -378,3 +378,96 @@ never commit unless explicitly asked).
    Vercel credentials).
 3. Pick next feature area: issue assignment UI, editing/deleting issues,
    or project settings (rename project, remove members).
+
+## Session: API rate limiting (brute force + enumeration hardening)
+Login lockout feature from last session committed (`21dc35e`). Continued
+with the next piece of the security work: user picked "API rate limiting"
+specifically (not headers/CSRF/session audit — deferred, not asked for).
+
+### Agent timeout/crash-prevention process change (per user request)
+User asked to actually enforce the existing CLAUDE.md "Agent Timeout /
+Runaway Protection" rule instead of letting it be silently skipped. Going
+forward: long-running commands run via the bash tool's background mode so
+they can be polled instead of blocking; PROGRESS.md gets checkpointed
+during the session (not just at the end) so a crash loses less context.
+Actual process-level crash prevention isn't possible from inside the
+session (that's a client/OS-level failure) — only the timeout/logging
+discipline is.
+
+### Design
+Postgres-backed fixed-window counter (single `RateLimitEntry` table:
+`key String @id`, `count Int @default(1)`, `resetAt DateTime`), atomic via
+one `INSERT ... ON CONFLICT (key) DO UPDATE ... CASE WHEN resetAt <= now
+THEN reset ELSE increment` statement (`src/lib/rateLimit.ts`). Chosen over
+in-memory counters because the app is serverless (Vercel) — in-memory
+state doesn't survive/sync across function instances, but the app already
+has a single Postgres source of truth via Supabase, so reusing it is the
+simplest consistent option without adding a new dependency (e.g. Upstash
+Redis).
+
+New `prisma/migrations/20261021065229_add_rate_limit_entry/` applied to
+the real Supabase DB.
+
+### Applied to
+- `POST /api/signup` — 5 requests / 15 min per IP.
+- Credentials login (`src/lib/auth/credentials.ts`, called from
+  `src/auth.ts`) — 10 attempts / 15 min per IP, checked *before* the
+  per-account lockout/password check (doesn't leak account existence; the
+  rate-limit rejection happens before any DB lookup). New `code:
+  "rate-limited"` on the thrown `CredentialsSignin`, surfaced as a distinct
+  message on `src/app/login/page.tsx`.
+- `POST /api/projects` (create project) — 10 / hour per user id. Expensive
+  operation (provisions a real Postgres schema), so keyed by user rather
+  than IP.
+- `POST /api/projects/[slug]/join` — 20 / hour per IP. Addresses the "other
+  hacking" part of the ask: project slugs end in only a 6-char random
+  suffix (`src/lib/slug.ts`), so this throttles brute-force slug/project
+  enumeration via the join endpoint.
+All four return `429` + `{error: string}` + a `Retry-After` header (whole
+seconds) when exceeded.
+
+### Issues caught by independent agent validator, fixed before finishing
+- **IP spoofing**: initial `getClientIp()` read the first entry of
+  `X-Forwarded-For` only. Verified (via web search of Vercel's own docs)
+  that Vercel overwrites/sanitizes this header at the edge and does not
+  forward client-supplied values — safe on this app's actual deployment
+  target. Still hardened by preferring `x-vercel-forwarded-for` (Vercel's
+  explicitly-guaranteed-authoritative variant) first, with `x-forwarded-for`
+  as fallback, and added a code comment documenting this is a
+  Vercel-specific trust assumption (would need re-checking if ever
+  self-hosted behind a different/untrusted proxy).
+- **Test gap**: original `rateLimit.test.ts` only asserted against
+  pre-fabricated mock return values, never exercised the actual
+  window-reset `CASE` logic across multiple calls. Added a second
+  `describe` block with a stateful in-memory mock that mirrors the real
+  SQL's upsert/reset semantics exactly, driven by `vi.useFakeTimers()`, to
+  prove: count increments within a window, the limit is enforced, the
+  counter actually resets once the window elapses, and separate keys don't
+  interfere with each other.
+- Validator confirmed: atomicity of the single `INSERT ... ON CONFLICT`
+  statement is correct under concurrency (row-level lock), no SQL
+  injection (tagged-template parameterization, not string concat),
+  off-by-one boundary (`count <= limit`) matches "N per window" semantics
+  and is test-covered, and check ordering in `credentials.ts` doesn't leak
+  account existence through the rate-limit path.
+
+Re-verified after fixes: `npx tsc --noEmit` clean, `npm run lint` clean
+(same pre-existing unrelated warnings only), `npm test` → **109/109
+passing** (94 previous + 15 new: 11 in `rateLimit.test.ts`, 1 in
+`credentials.test.ts`, 1 each in signup/projects/join route tests), `npm
+run build` succeeds, same route list as before (no new routes, logic
+added to existing handlers).
+
+Not yet committed — ask user first (per rule: never commit unless
+explicitly asked).
+
+### Next steps if asked to continue
+1. Commit this rate-limiting work (uncommitted).
+2. Other security items from the earlier menu, deferred since user picked
+   rate limiting only this round: security headers (CSP/HSTS/etc via
+   middleware or next.config.ts), broader input-hardening audit,
+   session/cookie flag verification. Ask before doing any of these.
+3. `CRON_SECRET` → Vercel env vars + actual deploy (still needs user's
+   Vercel credentials).
+4. Pick next feature area: issue assignment UI, editing/deleting issues,
+   or project settings.
