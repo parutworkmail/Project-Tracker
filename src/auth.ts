@@ -1,11 +1,14 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import bcrypt from "bcryptjs";
 
 import { prisma } from "@/lib/prisma";
-import { loginSchema } from "@/lib/validation/auth";
+import { authenticateCredentials, AccountLockedError } from "@/lib/auth/credentials";
+
+class AccountLockedSignInError extends CredentialsSignin {
+  code = "account-locked";
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -38,32 +41,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: {},
       },
       authorize: async (credentials) => {
-        const parsed = loginSchema.safeParse(credentials);
-
-        if (!parsed.success) {
-          return null;
+        try {
+          return await authenticateCredentials(credentials);
+        } catch (error) {
+          if (error instanceof AccountLockedError) {
+            throw new AccountLockedSignInError();
+          }
+          throw error;
         }
-
-        const { email, password } = parsed.data;
-
-        const user = await prisma.user.findUnique({ where: { email } });
-
-        if (!user?.password) {
-          return null;
-        }
-
-        const isValid = await bcrypt.compare(password, user.password);
-
-        if (!isValid) {
-          return null;
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
-        };
       },
     }),
   ],

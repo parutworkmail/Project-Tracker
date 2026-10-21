@@ -4,6 +4,28 @@ Read this file first in any new session to see what's done and what's next.
 
 ## Status: core app complete, keep-alive cron added
 
+### Decision log: next-auth vs better-auth (verified, NOT migrating)
+A prior (crashed, unlogged) session apparently recommended switching from
+next-auth to `better-auth`. Re-verified from scratch this session:
+- next-auth v5 (`beta.32`) is beta-labeled but functionally production-ready
+  per Auth.js's own maintainers ("beta tag reflects API refinement, not
+  instability"). Current setup: fully implemented, 85 passing tests,
+  tsc/lint/build clean, manually verified against real Supabase DB. No bugs.
+- better-auth's main advantage (built-in RBAC plugin) doesn't apply here —
+  this project's roles (`ProjectRole` enum: OWNER/MEMBER in
+  `prisma/schema.prisma`) are already hand-rolled at the app level via
+  manual membership checks in route handlers, independent of the auth
+  library. Switching wouldn't simplify that.
+- Auth.js's "use Better Auth" recommendation is explicitly for **new**
+  projects, not existing working v5 setups.
+- No feature gap exists: project.md requires accounts/login/signup/cloud
+  hosting/Supabase/Vercel — all already satisfied by next-auth.
+- Migration cost would be real (rewrite `auth.ts`, Prisma User/Account/
+  Session/VerificationToken models, `/api/signup`, login/signup pages, and
+  a chunk of the test suite) for zero functional gain.
+- **Verdict: keep next-auth. Do not migrate** unless a concrete feature gap
+  (e.g. built-in 2FA, magic links) becomes an actual requirement later.
+
 ### Done
 - Full stack scaffolded: Next.js App Router + TS, Prisma (adapter-pg), NextAuth
   (Credentials + Google), Zod validation, react-hook-form.
@@ -258,3 +280,101 @@ No tasks hit the 5-minute timeout threshold this session.
 2. Pick next feature area: issue assignment UI, editing/deleting issues,
    or project settings (rename project, remove members) — project.md
    doesn't specify further scope beyond what's built.
+
+## Session: Added vitest unit test suite + re-verification (session continued after crash)
+Added `vitest` + `vite-tsconfig-paths` (devDependencies; bumped `@types/node`
+from exact `20.19.43` to `^24.0.0` to satisfy vitest 5's peer requirement —
+matches the actual installed Node runtime, v24). New `vitest.config.ts`
+(`environment: "node"`, `globals: true`, `include: ["src/**/*.test.ts"]`),
+new `npm test` / `npm run test:watch` scripts.
+
+**85 tests added, all passing**, covering every pure/business-logic module
+and every API route, co-located as `*.test.ts` next to the file tested:
+- `src/lib/slug.test.ts`, `src/lib/validation/auth.test.ts`,
+  `src/lib/validation/project.test.ts` — pure functions / Zod schemas, no
+  mocking needed.
+- `src/lib/projectSchema.test.ts` — mocks only `@/lib/prisma`
+  ($executeRawUnsafe/$queryRawUnsafe), exercises the real
+  `generateSchemaName`/`assertValidSchemaName` logic.
+- `src/app/api/signup/route.test.ts`, `.../cron/keep-alive/route.test.ts`,
+  `.../projects/route.test.ts`, `.../projects/[slug]/route.test.ts`,
+  `.../projects/[slug]/issues/route.test.ts`,
+  `.../projects/[slug]/issues/[issueId]/route.test.ts`,
+  `.../projects/[slug]/join/route.test.ts` — mock `@/auth` and `@/lib/prisma`
+  (and `@/lib/projectSchema` where relevant) via `vi.hoisted`, assert real
+  status codes/response shapes/call args (401/403/404/400/409/201/200 paths).
+
+**Real production bug caught and fixed**: `src/lib/projectSchema.ts`
+`SCHEMA_NAME_PATTERN` was `/^proj_[a-f0-9]{24}$/` but `generateSchemaName()`
+produces `proj_` + a 32-hex-char UUID (dashes stripped) — meaning
+`assertValidSchemaName` threw "Invalid schema name" for every schema name
+the app actually generates, so **every real project creation would have
+failed** (`provisionProjectSchema` in the POST `/api/projects` flow would
+throw before the project row is even created). Fixed: pattern now
+`/^proj_[a-f0-9]{32}$/`. `src/lib/projectSchema.test.ts` regression-guards
+this going forward. Independent agent validator confirmed: fix matches
+actual UUID length, no other code in `src/` or `prisma/` assumes 24 chars,
+and spot-checked test files correctly mirror real route behavior (not just
+asserting against mock internals).
+
+Re-verified after the fix: `npx tsc --noEmit` clean, `npm run lint` clean
+(same pre-existing unrelated `.axet-code/tmp` warnings only), `npm run build`
+succeeds, `npm test` → 85/85 passing.
+
+### Next steps if asked to continue
+1. `CRON_SECRET` → Vercel env vars + actual deploy (still needs user's
+   Vercel credentials).
+2. Pick next feature area: issue assignment UI, editing/deleting issues,
+   or project settings (rename project, remove members).
+3. Consider adding component-level tests (e.g. for
+   `google-signin-button.tsx`, forms) if UI regression coverage is wanted —
+   current suite covers lib/validation + API routes only, no React
+   component tests yet.
+
+## Session: Login lockout feature (session crashed mid-work, resumed)
+Session crashed again without logging. Resumed by inspecting `git status`/
+`git diff` to reconstruct state before touching anything further (per user
+instruction to log before acting).
+
+### State found on resume (uncommitted, not yet verified this session)
+- `prisma/schema.prisma`: `User` gained `failedLoginAttempts Int @default(0)`
+  and `lockedUntil DateTime?`.
+- `prisma/migrations/20261021060352_add_login_lockout/migration.sql`: adds
+  those two columns. Confirmed via `npx prisma migrate status` — already
+  applied to the real Supabase DB ("3 migrations found", "schema is up to
+  date").
+- New `src/lib/auth/credentials.ts`: extracted `authenticateCredentials()`
+  out of `src/auth.ts`'s `authorize()`. Locks account for 15 min
+  (`LOCKOUT_DURATION_MS`) after 5 failed attempts (`MAX_FAILED_ATTEMPTS`),
+  throws `AccountLockedError` if already locked or on the attempt that
+  trips the lock, resets counters on a successful login or an expired lock.
+- `src/auth.ts`: `authorize()` now delegates to `authenticateCredentials`,
+  maps `AccountLockedError` to a custom `AccountLockedSignInError` (extends
+  NextAuth's `CredentialsSignin`, `code = "account-locked"`).
+- `src/app/login/page.tsx`: checks `result.code === "account-locked"` and
+  shows a distinct "temporarily locked, try again in 15 minutes" message.
+- New `src/lib/auth/credentials.test.ts`: 8 unit tests covering invalid
+  payload, missing user, OAuth-only (no password) user, active lock
+  (rejects, no update call), expired lock (clears + succeeds), wrong
+  password incrementing counter, hitting `MAX_FAILED_ATTEMPTS` (locks +
+  resets counter to 0), successful login clearing prior failures, and
+  successful login with clean history (no spurious update call).
+- All of the above was NOT yet verified (tsc/lint/build/test) before the
+  crash — doing that now this session before anything else.
+
+### Verified this session
+`npx tsc --noEmit` clean. `npm run lint` clean (same pre-existing unrelated
+`.axet-code/tmp` warnings only). `npm test` → 94/94 passing (85 previous +
+9 new in `credentials.test.ts`). `npm run build` succeeds, same route list
+as before (lockout logic lives inside the existing `/api/auth/[...nextauth]`
+handler, no new routes). Migration already applied to the real Supabase DB.
+Login lockout feature is complete and verified. Nothing left uncommitted
+needs further work — just needs a commit (not done automatically per rule:
+never commit unless explicitly asked).
+
+### Next steps if asked to continue
+1. Commit the login lockout feature (uncommitted — ask user first).
+2. `CRON_SECRET` → Vercel env vars + actual deploy (still needs user's
+   Vercel credentials).
+3. Pick next feature area: issue assignment UI, editing/deleting issues,
+   or project settings (rename project, remove members).

@@ -41,7 +41,11 @@ function LoginForm() {
     });
 
     if (result?.error) {
-      setFormError("Invalid email or password.");
+      setFormError(
+        result.code === "account-locked"
+          ? "Too many failed attempts. This account is temporarily locked — try again in 15 minutes."
+          : "Invalid email or password."
+      );
       return;
     }
 

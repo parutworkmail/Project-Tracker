@@ -2,7 +2,7 @@ import { randomUUID } from "crypto";
 
 import { prisma } from "@/lib/prisma";
 
-const SCHEMA_NAME_PATTERN = /^proj_[a-f0-9]{24}$/;
+const SCHEMA_NAME_PATTERN = /^proj_[a-f0-9]{32}$/;
 
 export function generateSchemaName(): string {
   return `proj_${randomUUID().replace(/-/g, "")}`;
