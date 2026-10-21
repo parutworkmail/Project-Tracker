@@ -5,17 +5,45 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-const adapter = new PrismaPg({
-  host: process.env.SUPABASE_DB_HOST,
-  port: Number(process.env.SUPABASE_DB_PORT ?? 5432),
-  user: process.env.SUPABASE_DB_USER,
-  password: process.env.SUPABASE_DB_PASSWORD,
-  database: process.env.SUPABASE_DB_NAME ?? "postgres",
-  ssl: { rejectUnauthorized: false },
-});
+const requiredEnvVars = [
+  "SUPABASE_DB_HOST",
+  "SUPABASE_DB_USER",
+  "SUPABASE_DB_PASSWORD",
+] as const;
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });
+function createPrismaClient(): PrismaClient {
+  for (const key of requiredEnvVars) {
+    if (!process.env[key]) {
+      throw new Error(
+        `Missing required environment variable: ${key}. Check your .env file.`
+      );
+    }
+  }
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
+  const adapter = new PrismaPg({
+    host: process.env.SUPABASE_DB_HOST,
+    port: Number(process.env.SUPABASE_DB_PORT ?? 5432),
+    user: process.env.SUPABASE_DB_USER,
+    password: process.env.SUPABASE_DB_PASSWORD,
+    database: process.env.SUPABASE_DB_NAME ?? "postgres",
+    ssl: { rejectUnauthorized: false },
+  });
+
+  return new PrismaClient({ adapter });
 }
+
+let lazyPrisma: PrismaClient | undefined = globalForPrisma.prisma;
+
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop, receiver) {
+    if (!lazyPrisma) {
+      lazyPrisma = createPrismaClient();
+
+      if (process.env.NODE_ENV !== "production") {
+        globalForPrisma.prisma = lazyPrisma;
+      }
+    }
+
+    return Reflect.get(lazyPrisma, prop, receiver);
+  },
+});

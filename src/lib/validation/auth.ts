@@ -8,7 +8,12 @@ export const loginSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 
 export const signupSchema = z.object({
-  name: z.string().min(1, "Name is required.").optional().or(z.literal("")),
+  name: z
+    .string()
+    .min(1, "Name is required.")
+    .optional()
+    .or(z.literal(""))
+    .transform((value) => (value ? value : undefined)),
   email: z.string().email("Enter a valid email address."),
   password: z
     .string()
@@ -16,4 +21,4 @@ export const signupSchema = z.object({
     .max(72, "Password must be at most 72 characters."),
 });
 
-export type SignupInput = z.infer<typeof signupSchema>;
+export type SignupInput = z.input<typeof signupSchema>;

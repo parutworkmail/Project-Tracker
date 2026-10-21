@@ -182,3 +182,79 @@ under "Terminated Tasks".
    settings — see earlier "Next steps" entry below for original list).
 2. Still outstanding from before: `CRON_SECRET` → Vercel env vars + actual
    deploy (needs user's Vercel credentials, not available in-session).
+
+## Session: Login/Register nice-to-haves (all 7 fixed)
+Fixed all 7 previously-deferred nice-to-have items from the validator
+review, using the same Team Lead + FE/Backend Validators (parallel) +
+End-to-End Validator workflow.
+
+### Changes
+1. `src/app/login/page.tsx`, `src/app/signup/page.tsx` — added `<label
+   htmlFor>` + matching `id` on every input (was placeholder-only).
+2. Same files — added `autoComplete` attributes: `"email"`,
+   `"current-password"` (login), `"new-password"` (signup), `"name"`.
+3. Same files — added `role="alert"` on field-level Zod errors, and
+   `role="alert" aria-live="polite"` on the top-level form error.
+4. New `src/components/google-signin-button.tsx` — extracted the
+   previously-duplicated "or divider" + Google button JSX from both pages
+   into one shared component, now with an `isRedirecting` state so the
+   button disables and shows "Redirecting..." instead of being clickable
+   multiple times. Both pages now just render `<GoogleSignInButton />`.
+5. `src/lib/validation/auth.ts` — `signupSchema.name` now normalizes `""` →
+   `undefined` at the schema level via `.transform()`, instead of only
+   downstream in the route handler. Exported `SignupInput` type switched
+   from `z.infer` to `z.input` (pre-transform shape) since that's what the
+   form actually collects — `z.infer` would have been the post-transform
+   output type and conflicted with `useForm`'s resolver typing.
+6. `src/lib/prisma.ts` — added a fail-fast check for required
+   `SUPABASE_DB_*` env vars before constructing the Prisma client.
+
+### Issues caught during validation, fixed before finishing
+- **Backend Validator caught a real regression risk**: the fail-fast env
+  check in `prisma.ts` was originally placed directly at module top-level,
+  which Next.js's `next build` "collecting page data" step would execute
+  for every route module on import — meaning a build without
+  `SUPABASE_DB_*` vars present at *build time* (not just runtime) would now
+  hard-fail where it previously wouldn't. Fixed: rewrote `prisma.ts` to
+  lazily construct the client via a `Proxy` whose `get` trap only runs
+  `createPrismaClient()` (env check + adapter) on first actual property
+  access (e.g. `prisma.user.findUnique`), not at import time. End-to-End
+  Validator separately confirmed `PrismaAdapter(prisma)` in `src/auth.ts`
+  still works correctly against the Proxy (it only does lazy per-call
+  property access, no eager inspection).
+- **FE Validator caught a latent UX bug**: the new `GoogleSignInButton`
+  called `signIn("google", ...)` without handling a rejected promise — if
+  the redirect failed to kick off, the button would stay disabled/stuck on
+  "Redirecting..." forever with no way to retry. Fixed: added
+  `.catch(() => setIsRedirecting(false))`.
+- Cleaned up now-redundant `name: name || undefined` in
+  `src/app/api/signup/route.ts` since the schema normalizes it already.
+
+All fixes re-verified: `npx tsc --noEmit` clean, `npm run lint` clean
+(same pre-existing unrelated warnings only), `npm run build` succeeds.
+End-to-End Validator gave final verdict **READY**.
+
+### Manual functional verification (real Supabase DB, dev server)
+- Signup with `name: ""` → stored as `null` in DB (confirmed via direct
+  API response `"name":null`), not empty string. ✅
+- `/login` and `/signup` HTML confirmed to contain correct `label
+  for="..."` attributes and `autoComplete` values (React renders the prop
+  as literal `autoComplete="..."` in the DOM, still valid/functional HTML
+  despite non-lowercase attribute name in raw HTML source). ✅
+- Test user cleaned up from DB after verification, along with 2 leftover
+  test users from the previous session that a broken cleanup script had
+  failed to actually delete (the cleanup script used
+  `require("@/generated/prisma/client")` which doesn't resolve under plain
+  `node -e` outside Next's module resolution — switched to raw `pg` client
+  for cleanup instead, which works reliably for ad-hoc DB scripts).
+- Dev server (background, for manual testing) was stopped and port 3000
+  confirmed free afterward.
+
+No tasks hit the 5-minute timeout threshold this session.
+
+### Next steps if asked to continue
+1. `CRON_SECRET` → Vercel env vars + actual deploy (still needs user's
+   Vercel credentials).
+2. Pick next feature area: issue assignment UI, editing/deleting issues,
+   or project settings (rename project, remove members) — project.md
+   doesn't specify further scope beyond what's built.

@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Suspense, useState } from "react";
 
 import { loginSchema, type LoginInput } from "@/lib/validation/auth";
+import { GoogleSignInButton } from "@/components/google-signin-button";
 
 export default function LoginPage() {
   return (
@@ -54,30 +55,48 @@ function LoginForm() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
+            <label htmlFor="login-email" className="text-sm font-medium">
+              Email
+            </label>
             <input
+              id="login-email"
               type="email"
+              autoComplete="email"
               placeholder="Email"
               {...register("email")}
               className="rounded border border-black/[.08] px-3 py-2 dark:border-white/[.145] dark:bg-black"
             />
             {errors.email && (
-              <p className="text-sm text-red-600">{errors.email.message}</p>
+              <p role="alert" className="text-sm text-red-600">
+                {errors.email.message}
+              </p>
             )}
           </div>
 
           <div className="flex flex-col gap-1">
+            <label htmlFor="login-password" className="text-sm font-medium">
+              Password
+            </label>
             <input
+              id="login-password"
               type="password"
+              autoComplete="current-password"
               placeholder="Password"
               {...register("password")}
               className="rounded border border-black/[.08] px-3 py-2 dark:border-white/[.145] dark:bg-black"
             />
             {errors.password && (
-              <p className="text-sm text-red-600">{errors.password.message}</p>
+              <p role="alert" className="text-sm text-red-600">
+                {errors.password.message}
+              </p>
             )}
           </div>
 
-          {formError && <p className="text-sm text-red-600">{formError}</p>}
+          {formError && (
+            <p role="alert" aria-live="polite" className="text-sm text-red-600">
+              {formError}
+            </p>
+          )}
 
           <button
             type="submit"
@@ -88,18 +107,7 @@ function LoginForm() {
           </button>
         </form>
 
-        <div className="my-4 flex items-center gap-2 text-sm text-zinc-500">
-          <div className="h-px flex-1 bg-black/[.08] dark:bg-white/[.145]" />
-          or
-          <div className="h-px flex-1 bg-black/[.08] dark:bg-white/[.145]" />
-        </div>
-
-        <button
-          onClick={() => signIn("google", { callbackUrl: "/" })}
-          className="w-full rounded border border-black/[.08] px-4 py-2 dark:border-white/[.145]"
-        >
-          Continue with Google
-        </button>
+        <GoogleSignInButton />
 
         <p className="mt-6 text-center text-sm text-zinc-500">
           No account?{" "}
