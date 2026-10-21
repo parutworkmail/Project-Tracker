@@ -7,8 +7,9 @@ type Role = "SUPER_ADMIN" | "ADMIN" | "USER";
 
 interface UserRow {
   id: string;
+  username: string;
   name: string | null;
-  email: string;
+  email: string | null;
   role: Role;
 }
 
@@ -54,6 +55,7 @@ export function UserRoleManager({
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-zinc-500">
+            <th className="py-2">Username</th>
             <th className="py-2">Name</th>
             <th className="py-2">Email</th>
             <th className="py-2">Role</th>
@@ -65,8 +67,9 @@ export function UserRoleManager({
               key={user.id}
               className="border-t border-black/[.08] dark:border-white/[.145]"
             >
+              <td className="py-2 font-medium">{user.username}</td>
               <td className="py-2">{user.name ?? "—"}</td>
-              <td className="py-2">{user.email}</td>
+              <td className="py-2">{user.email ?? "—"}</td>
               <td className="py-2">
                 {user.id === currentUserId ? (
                   <span className="text-zinc-500">{user.role} (you)</span>

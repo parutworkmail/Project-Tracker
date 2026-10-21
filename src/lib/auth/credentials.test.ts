@@ -32,7 +32,8 @@ const IP = "127.0.0.1";
 function makeUser(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     id: "user-1",
-    email: "jane@example.com",
+    username: "jane",
+    email: null,
     name: "Jane",
     image: null,
     password: "hashed",
@@ -50,9 +51,9 @@ describe("authenticateCredentials", () => {
     checkRateLimit.mockResolvedValue({ allowed: true, retryAfterMs: 0 });
   });
 
-  it("returns null for an invalid payload (bad email format)", async () => {
+  it("returns null for an invalid payload (missing username)", async () => {
     const result = await authenticateCredentials(
-      { email: "not-an-email", password: "x" },
+      { password: "x" },
       IP
     );
 
@@ -64,18 +65,18 @@ describe("authenticateCredentials", () => {
     userFindUnique.mockResolvedValue(null);
 
     const result = await authenticateCredentials(
-      { email: "jane@example.com", password: "password123" },
+      { username: "jane", password: "password123" },
       IP
     );
 
     expect(result).toBeNull();
   });
 
-  it("returns null when the user has no password set (OAuth-only account)", async () => {
+  it("returns null when the user has no password set", async () => {
     userFindUnique.mockResolvedValue(makeUser({ password: null }));
 
     const result = await authenticateCredentials(
-      { email: "jane@example.com", password: "password123" },
+      { username: "jane", password: "password123" },
       IP
     );
 
@@ -87,7 +88,7 @@ describe("authenticateCredentials", () => {
 
     await expect(
       authenticateCredentials(
-        { email: "jane@example.com", password: "password123" },
+        { username: "jane", password: "password123" },
         IP
       )
     ).rejects.toThrow(RateLimitedError);
@@ -102,7 +103,7 @@ describe("authenticateCredentials", () => {
 
     await expect(
       authenticateCredentials(
-        { email: "jane@example.com", password: "password123" },
+        { username: "jane", password: "password123" },
         IP
       )
     ).rejects.toThrow(AccountLockedError);
@@ -122,13 +123,13 @@ describe("authenticateCredentials", () => {
     userUpdate.mockResolvedValue({});
 
     const result = await authenticateCredentials(
-      { email: "jane@example.com", password: "password123" },
+      { username: "jane", password: "password123" },
       IP
     );
 
     expect(result).toEqual({
       id: "user-1",
-      email: "jane@example.com",
+      email: null,
       name: "Jane",
       image: null,
     });
@@ -146,7 +147,7 @@ describe("authenticateCredentials", () => {
     userUpdate.mockResolvedValue({});
 
     const result = await authenticateCredentials(
-      { email: "jane@example.com", password: "wrong-password" },
+      { username: "jane", password: "wrong-password" },
       IP
     );
 
@@ -169,7 +170,7 @@ describe("authenticateCredentials", () => {
 
     await expect(
       authenticateCredentials(
-        { email: "jane@example.com", password: "wrong-password" },
+        { username: "jane", password: "wrong-password" },
         IP
       )
     ).rejects.toThrow(AccountLockedError);
@@ -188,7 +189,7 @@ describe("authenticateCredentials", () => {
     userUpdate.mockResolvedValue({});
 
     const result = await authenticateCredentials(
-      { email: "jane@example.com", password: "correct-password" },
+      { username: "jane", password: "correct-password" },
       IP
     );
 
@@ -204,7 +205,7 @@ describe("authenticateCredentials", () => {
     userFindUnique.mockResolvedValue(makeUser({ password: hash }));
 
     const result = await authenticateCredentials(
-      { email: "jane@example.com", password: "correct-password" },
+      { username: "jane", password: "correct-password" },
       IP
     );
 

@@ -23,7 +23,7 @@ export function Nav() {
                 Admin
               </Link>
             )}
-            <span className="text-zinc-500">{session.user?.email}</span>
+            <span className="text-zinc-500">{session.user?.username}</span>
             <button
               onClick={() => signOut({ callbackUrl: "/" })}
               className="rounded border border-black/[.08] px-3 py-1 dark:border-white/[.145]"
@@ -32,17 +32,9 @@ export function Nav() {
             </button>
           </>
         ) : status === "loading" ? null : (
-          <>
-            <Link href="/login" className="hover:underline">
-              Log in
-            </Link>
-            <Link
-              href="/signup"
-              className="rounded bg-foreground px-3 py-1 text-background"
-            >
-              Sign up
-            </Link>
-          </>
+          <Link href="/login" className="hover:underline">
+            Log in
+          </Link>
         )}
       </nav>
     </header>

@@ -1,6 +1,5 @@
 import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 
 import { prisma } from "@/lib/prisma";
@@ -34,22 +33,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const dbUser = await prisma.user.findUnique({
           where: { id: session.user.id },
-          select: { role: true },
+          select: { username: true, role: true, mustChangePassword: true },
         });
 
+        session.user.username = dbUser?.username ?? "";
         session.user.role = dbUser?.role ?? "USER";
+        session.user.mustChangePassword = dbUser?.mustChangePassword ?? false;
       }
       return session;
     },
   },
   providers: [
-    Google({
-      clientId: process.env.AUTH_GOOGLE_ID,
-      clientSecret: process.env.AUTH_GOOGLE_SECRET,
-    }),
     Credentials({
       credentials: {
-        email: {},
+        username: {},
         password: {},
       },
       authorize: async (credentials, request) => {

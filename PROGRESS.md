@@ -8,12 +8,99 @@ Logging". Shows exactly what was happening if the last session crashed.)
 
 - **Plan**: (none in progress)
 - **Status**: idle.
-- **Next**: none — awaiting next user request. Last completed work: 3-tier
-  global role (SUPER_ADMIN/ADMIN/USER) RBAC feature, verified clean
-  (tsc/lint/build/159 tests/agent validator), not yet committed — see
-  "Session: Global role-based access control" below for full details.
+- **Next**: none — awaiting next user request. Last completed work:
+  username-based auth + SUPER_ADMIN-only user creation + forced
+  password-change redesign, verified clean (tsc/lint/build/179 tests/
+  agent validator), not yet committed — see "Session: Username-based
+  auth, admin-created users, forced password change" below for full
+  details.
 
-## Status: core app complete, keep-alive cron added
+## Session: Username-based auth, admin-created users, forced password change
+User raised two concerns about the old email/password signup: (1) email was
+unverified, so any fake address (`hello@fake.co`) passed, and (2) only one
+password field on register, no confirm, no show/hide toggle. Discussion
+pivoted: this is an in-house/internal tool, not public signup, so instead of
+adding email verification the real fix is removing self-service signup
+entirely — users get created by a SUPER_ADMIN with a temp password, must
+change it on first login, and log in by username (no email required at
+all). Session crashed multiple times mid-implementation; each resume
+re-verified actual repo/DB state via git status/diff + `npx prisma migrate
+status` + `npx tsc --noEmit` before continuing, per the Crash-Safe Task
+Logging rule — this caught real gaps the live log's own prior entries had
+missed (e.g. two "done" claims that were actually still mid-edit).
+
+### What changed
+- **Schema**: `User.username` (new, required, unique — the login
+  identifier), `User.email` (now nullable — optional contact field only,
+  never used for login/verification), `User.mustChangePassword` (default
+  `true`). Migration hand-written (not `prisma migrate dev`, which can't
+  auto-generate a required-unique-column migration against existing rows
+  non-interactively): adds columns nullable, backfills existing rows
+  (named mappings for the 3 known users + an email-local-part fallback for
+  any others), sets `mustChangePassword = false` for all of them (they
+  already have self-chosen passwords), then enforces `NOT NULL`/`UNIQUE`.
+  Applied to the real Supabase DB.
+- **Removed entirely**: public `/signup` page, `/api/signup` route, Google
+  OAuth provider (`AUTH_GOOGLE_ID`/`SECRET` no longer referenced in code).
+  This app is credentials-only now.
+- **Login**: `src/auth.ts`/`credentials.ts` authenticate by `username`
+  instead of `email`. Session (`src/types/next-auth.d.ts` +
+  `src/auth.ts`) now also carries `username` and `mustChangePassword`,
+  both re-fetched fresh from the DB on every request (same pattern as
+  `role`) — a role change or forced-password-reset takes effect
+  immediately, no re-login needed.
+- **New SUPER_ADMIN "create user" feature**: `/admin/users/new` page +
+  `POST /api/admin/users` — username (3-32 chars,
+  `^[a-zA-Z0-9_.-]+$`), optional name/email, a role select, and a
+  temp password (+ confirm, client-side only). Always creates with
+  `mustChangePassword: true` (hardcoded server-side, not client
+  -controlled), `bcrypt.hash(password, 10)`, handles duplicate
+  username/email via Prisma P2002 → 409 naming the actual conflicting
+  field.
+- **Forced password change**: `/change-password` page (reachable by any
+  logged-in user, not just when forced — only gates on `session.user.id`,
+  never on `mustChangePassword` itself, so it can't loop) + `PATCH
+  /api/account/password` (always operates on `session.user.id` only —
+  confirmed via test that a body-supplied id is ignored — clears
+  `mustChangePassword` on success). All 4 protected pages (`dashboard`,
+  `projects/[slug]`, `admin`, `admin/users/new`) redirect to
+  `/change-password` if `session.user.mustChangePassword` is true,
+  checked *before* any role-based redirect so it can't be bypassed.
+- **UI asks (the original ones)**: new reusable
+  `src/components/password-input.tsx` — `forwardRef`-wrapped (works with
+  react-hook-form's `register`), eye/eye-off SVG toggle
+  (`type="button"`, `tabIndex={-1}` so Tab skips the icon), used on
+  login, create-user, and change-password forms. Confirm-password added
+  to both the create-user form and the change-password form via
+  `.refine()`-based Zod schemas (`createUserFormSchema`,
+  `changePasswordFormSchema`) — `confirmPassword` is always stripped out
+  client-side before the actual API call, never sent to the server.
+- `src/components/nav.tsx` and the admin console (`UserRoleManager`,
+  `ProjectAdminManager`) updated to show `username` as the primary
+  identifier with `email ?? "—"` as a secondary optional field.
+
+### Verification
+`npx tsc --noEmit` clean. `npm run lint` clean (same pre-existing
+unrelated warnings only). `npm test` → **179/179 passing** (146 carried
+over + 33 new: `validation/admin.test.ts`, `validation/auth.test.ts`
+additions, `admin/users/route.test.ts` POST additions,
+`account/password/route.test.ts`). `npm run build` succeeds — route list
+confirms `/signup` and `/api/signup` are gone, `/change-password` and
+`/admin/users/new` are present. Independent agent validator reviewed the
+full redesign (redirect-loop risk, check ordering on all 4 protected
+pages, cross-user password-change risk, hardcoded `mustChangePassword`,
+lockout/rate-limit regression risk from the username switch, leftover
+email/Google references, `PasswordInput` ref-forwarding and button type,
+confirm-password stripping, migration backfill correctness). **Verdict:
+no issues found** — one non-blocking a11y nit noted (the eye-icon toggle
+is `tabIndex={-1}`, an intentional choice, not a bug).
+
+### Not yet done
+- Not committed yet — ask user first (per rule: never commit unless
+  explicitly asked).
+- Project docs (`project.md`, `README.md`) still describe the app as
+  having public signup/Google OAuth — not updated this session (not
+  asked for; mentioning as a known doc-drift, not a code bug).
 
 ## Session: Global role-based access control (SUPER_ADMIN/ADMIN/USER)
 Replaced the old per-project `ProjectRole` (OWNER/MEMBER) model entirely

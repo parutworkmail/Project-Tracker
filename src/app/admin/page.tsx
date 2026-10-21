@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -14,6 +15,10 @@ export default async function AdminPage() {
     redirect("/login");
   }
 
+  if (session.user.mustChangePassword) {
+    redirect("/change-password");
+  }
+
   if (session.user.role !== "SUPER_ADMIN") {
     redirect("/dashboard");
   }
@@ -21,13 +26,15 @@ export default async function AdminPage() {
   const [users, projects] = await Promise.all([
     prisma.user.findMany({
       orderBy: { createdAt: "asc" },
-      select: { id: true, name: true, email: true, role: true },
+      select: { id: true, username: true, name: true, email: true, role: true },
     }),
     prisma.project.findMany({
       orderBy: { createdAt: "desc" },
       include: {
         admins: {
-          include: { user: { select: { id: true, name: true, email: true } } },
+          include: {
+            user: { select: { id: true, username: true, name: true, email: true } },
+          },
         },
         _count: { select: { members: true } },
       },
@@ -42,7 +49,15 @@ export default async function AdminPage() {
         <h1 className="mb-8 text-2xl font-semibold">Admin console</h1>
 
         <section className="mb-12">
-          <h2 className="mb-4 text-lg font-medium">Users</h2>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-medium">Users</h2>
+            <Link
+              href="/admin/users/new"
+              className="rounded bg-foreground px-3 py-1 text-xs text-background"
+            >
+              Create user
+            </Link>
+          </div>
           <UserRoleManager
             users={users}
             currentUserId={session.user.id}
@@ -59,6 +74,7 @@ export default async function AdminPage() {
               memberCount: p._count.members,
               admins: p.admins.map((a) => ({
                 id: a.user.id,
+                username: a.user.username,
                 name: a.user.name,
                 email: a.user.email,
               })),

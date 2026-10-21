@@ -1,5 +1,32 @@
 # CLAUDE.md — Project Tracker Site
 
+## RULE ZERO — LOG BEFORE YOU TOUCH ANYTHING (no exceptions, read this first, every message)
+This has been violated before by treating it as optional for "small" or
+"obviously what the user asked for" actions. It is NOT optional and there
+is NO exception for quick/obvious/small/user-explicitly-said-so requests.
+
+**Before the FIRST bash/edit/write/multiedit call of ANY new user request**
+(even a one-line request like "mark user X as super admin" or "run this
+query"), you MUST first write a `### Live Task Log` entry at the top of
+`PROGRESS.md` stating, in the user's own intent:
+- **Plan**: "User wants me to <exactly what they asked, in their terms>."
+- **Status**: `in progress`.
+
+Only AFTER that PROGRESS.md edit has actually been made do you call any
+other tool. If you catch yourself about to run bash/edit/write/multiedit
+and there is no fresh `in progress` log entry for this exact request yet
+— STOP, write the log entry first, then proceed.
+
+When the request is finished, update that same entry: **Status**: `done`
+(or `failed`/`blocked`) + result in 1-2 lines, and **Next**: what's next.
+
+This is rule zero because every other rule/workflow in this file assumes
+it already happened — crash recovery, the Team Workflow, the timeout
+protocol all depend on the log being written first. Full mechanics of
+what goes in the log and how it's trimmed/folded over time are in
+"Crash-Safe Task Logging" below — but the ONE non-negotiable part is:
+log BEFORE, not after, with no exceptions for how small the ask looks.
+
 ## Session Start
 Read `PROGRESS.md` first — it tracks what's done, known loose ends, and next
 steps across sessions. Update it after each meaningful change.
@@ -9,9 +36,10 @@ A session can crash mid-task with zero warning. Logging only at the end of a
 session is not good enough — if the crash happens mid-task, nothing was ever
 written down and the next session can't tell what was left mid-flight. So:
 
-1. Before starting ANY non-trivial task/step (writing code, running a
-   migration, a long command, etc.), first write/update a `### Live Task Log`
-   section at the TOP of `PROGRESS.md` with:
+1. Before starting ANY task/step — including ones that look trivial, are
+   one line long, or are a direct literal instruction from the user — first
+   write/update a `### Live Task Log` section at the TOP of `PROGRESS.md`
+   with:
    - **Plan**: what I'm about to do, in 1-3 lines.
    - **Status**: `in progress`.
 2. Only after that log entry is written, actually execute the step.

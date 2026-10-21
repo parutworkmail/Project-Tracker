@@ -25,7 +25,7 @@ export class RateLimitedError extends Error {
 
 export interface AuthorizedUser {
   id: string;
-  email: string;
+  email: string | null;
   name: string | null;
   image: string | null;
 }
@@ -50,9 +50,9 @@ export async function authenticateCredentials(
     return null;
   }
 
-  const { email, password } = parsed.data;
+  const { username, password } = parsed.data;
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({ where: { username } });
 
   if (!user?.password) {
     return null;

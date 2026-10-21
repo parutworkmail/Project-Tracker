@@ -20,11 +20,13 @@ enum GlobalRole {
 
 model User {
   id                  String     @id @default(cuid())
+  username            String     @unique
   name                String?
-  email               String     @unique
+  email               String?    @unique
   emailVerified       DateTime?
   image               String?
   password            String?
+  mustChangePassword  Boolean    @default(true)
   role                GlobalRole @default(USER)
   failedLoginAttempts Int        @default(0)
   lockedUntil         DateTime?

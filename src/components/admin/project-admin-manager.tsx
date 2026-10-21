@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 
 interface AdminUser {
   id: string;
+  username: string;
   name: string | null;
-  email: string;
+  email: string | null;
 }
 
 interface ProjectRow {
@@ -112,13 +113,13 @@ export function ProjectAdminManager({
                       key={admin.id}
                       className="flex items-center gap-1 rounded bg-black/[.06] px-2 py-1 text-xs dark:bg-white/[.08]"
                     >
-                      {admin.name ?? admin.email}
+                      {admin.name ?? admin.username}
                       <button
                         type="button"
                         disabled={pendingSlug === project.slug}
                         onClick={() => unassign(project.slug, admin.id)}
                         className="text-red-600 disabled:opacity-50"
-                        aria-label={`Remove ${admin.email} as admin`}
+                        aria-label={`Remove ${admin.username} as admin`}
                       >
                         ×
                       </button>
@@ -142,7 +143,7 @@ export function ProjectAdminManager({
                     <option value="">Select an admin…</option>
                     {assignable.map((admin) => (
                       <option key={admin.id} value={admin.id}>
-                        {admin.name ?? admin.email}
+                        {admin.name ?? admin.username}
                       </option>
                     ))}
                   </select>

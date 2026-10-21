@@ -1,19 +1,30 @@
 import { describe, expect, it } from "vitest";
 
-import { loginSchema, signupSchema } from "./auth";
+import {
+  loginSchema,
+  changePasswordSchema,
+  changePasswordFormSchema,
+} from "./auth";
 
 describe("loginSchema", () => {
-  it("accepts a valid email/password pair", () => {
+  it("accepts a valid username/password pair", () => {
     const result = loginSchema.safeParse({
-      email: "user@example.com",
+      username: "jane",
       password: "anything",
     });
     expect(result.success).toBe(true);
   });
 
-  it("rejects an invalid email", () => {
+  it("rejects an empty username", () => {
     const result = loginSchema.safeParse({
-      email: "not-an-email",
+      username: "",
+      password: "anything",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a missing username", () => {
+    const result = loginSchema.safeParse({
       password: "anything",
     });
     expect(result.success).toBe(false);
@@ -21,75 +32,60 @@ describe("loginSchema", () => {
 
   it("rejects an empty password", () => {
     const result = loginSchema.safeParse({
-      email: "user@example.com",
+      username: "jane",
       password: "",
     });
     expect(result.success).toBe(false);
   });
 });
 
-describe("signupSchema", () => {
-  it("accepts a valid signup payload", () => {
-    const result = signupSchema.safeParse({
-      name: "Jane",
-      email: "jane@example.com",
-      password: "password123",
-    });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.name).toBe("Jane");
-    }
-  });
-
-  it("normalizes an empty string name to undefined", () => {
-    const result = signupSchema.safeParse({
-      name: "",
-      email: "jane@example.com",
-      password: "password123",
-    });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.name).toBeUndefined();
-    }
-  });
-
-  it("allows name to be omitted entirely", () => {
-    const result = signupSchema.safeParse({
-      email: "jane@example.com",
-      password: "password123",
+describe("changePasswordSchema", () => {
+  it("accepts a password of exactly 8 characters", () => {
+    const result = changePasswordSchema.safeParse({
+      newPassword: "a".repeat(8),
     });
     expect(result.success).toBe(true);
   });
 
   it("rejects a password shorter than 8 characters", () => {
-    const result = signupSchema.safeParse({
-      email: "jane@example.com",
-      password: "short1",
+    const result = changePasswordSchema.safeParse({
+      newPassword: "short1",
     });
     expect(result.success).toBe(false);
   });
 
-  it("rejects a password longer than 72 characters (bcrypt truncation guard)", () => {
-    const result = signupSchema.safeParse({
-      email: "jane@example.com",
-      password: "a".repeat(73),
+  it("rejects a password longer than 72 characters", () => {
+    const result = changePasswordSchema.safeParse({
+      newPassword: "a".repeat(73),
     });
     expect(result.success).toBe(false);
   });
 
   it("accepts a password exactly at the 72 char boundary", () => {
-    const result = signupSchema.safeParse({
-      email: "jane@example.com",
-      password: "a".repeat(72),
+    const result = changePasswordSchema.safeParse({
+      newPassword: "a".repeat(72),
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("changePasswordFormSchema", () => {
+  it("accepts matching newPassword and confirmPassword", () => {
+    const result = changePasswordFormSchema.safeParse({
+      newPassword: "password123",
+      confirmPassword: "password123",
     });
     expect(result.success).toBe(true);
   });
 
-  it("rejects an invalid email", () => {
-    const result = signupSchema.safeParse({
-      email: "nope",
-      password: "password123",
+  it("rejects mismatched newPassword and confirmPassword", () => {
+    const result = changePasswordFormSchema.safeParse({
+      newPassword: "password123",
+      confirmPassword: "different123",
     });
     expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.confirmPassword).toBeDefined();
+    }
   });
 });

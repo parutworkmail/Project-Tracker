@@ -22,6 +22,10 @@ export default async function ProjectPage({
     redirect("/login");
   }
 
+  if (session.user.mustChangePassword) {
+    redirect("/change-password");
+  }
+
   const { slug } = await params;
 
   const project = await prisma.project.findUnique({

@@ -14,6 +14,10 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
+  if (session.user.mustChangePassword) {
+    redirect("/change-password");
+  }
+
   const memberships = await prisma.projectMember.findMany({
     where: { userId: session.user.id },
     include: { project: true },

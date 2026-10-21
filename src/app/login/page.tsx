@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Suspense, useState } from "react";
 
 import { loginSchema, type LoginInput } from "@/lib/validation/auth";
-import { GoogleSignInButton } from "@/components/google-signin-button";
+import { PasswordInput } from "@/components/password-input";
 
 export default function LoginPage() {
   return (
@@ -48,7 +48,7 @@ function LoginForm() {
       } else if (result.code === "rate-limited") {
         setFormError("Too many login attempts. Please try again later.");
       } else {
-        setFormError("Invalid email or password.");
+        setFormError("Invalid username or password.");
       }
       return;
     }
@@ -63,20 +63,20 @@ function LoginForm() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
-            <label htmlFor="login-email" className="text-sm font-medium">
-              Email
+            <label htmlFor="login-username" className="text-sm font-medium">
+              Username
             </label>
             <input
-              id="login-email"
-              type="email"
-              autoComplete="email"
-              placeholder="Email"
-              {...register("email")}
+              id="login-username"
+              type="text"
+              autoComplete="username"
+              placeholder="Username"
+              {...register("username")}
               className="rounded border border-black/[.08] px-3 py-2 dark:border-white/[.145] dark:bg-black"
             />
-            {errors.email && (
+            {errors.username && (
               <p role="alert" className="text-sm text-red-600">
-                {errors.email.message}
+                {errors.username.message}
               </p>
             )}
           </div>
@@ -85,13 +85,12 @@ function LoginForm() {
             <label htmlFor="login-password" className="text-sm font-medium">
               Password
             </label>
-            <input
+            <PasswordInput
               id="login-password"
-              type="password"
               autoComplete="current-password"
               placeholder="Password"
               {...register("password")}
-              className="rounded border border-black/[.08] px-3 py-2 dark:border-white/[.145] dark:bg-black"
+              className="rounded border border-black/[.08] py-2 pl-3 dark:border-white/[.145] dark:bg-black"
             />
             {errors.password && (
               <p role="alert" className="text-sm text-red-600">
@@ -114,15 +113,6 @@ function LoginForm() {
             {isSubmitting ? "Logging in..." : "Log in"}
           </button>
         </form>
-
-        <GoogleSignInButton />
-
-        <p className="mt-6 text-center text-sm text-zinc-500">
-          No account?{" "}
-          <a href="/signup" className="font-medium text-foreground">
-            Sign up
-          </a>
-        </p>
       </div>
     </div>
   );

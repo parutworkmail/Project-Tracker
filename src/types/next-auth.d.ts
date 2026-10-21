@@ -5,7 +5,9 @@ declare module "next-auth" {
   interface Session {
     user: {
       id: string;
+      username: string;
       role: GlobalRole;
+      mustChangePassword: boolean;
     } & DefaultSession["user"];
   }
 }

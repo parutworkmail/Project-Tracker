@@ -1,24 +1,28 @@
 import { z } from "zod";
 
 export const loginSchema = z.object({
-  email: z.string().email("Enter a valid email address."),
+  username: z.string().min(1, "Username is required."),
   password: z.string().min(1, "Password is required."),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;
 
-export const signupSchema = z.object({
-  name: z
-    .string()
-    .min(1, "Name is required.")
-    .optional()
-    .or(z.literal(""))
-    .transform((value) => (value ? value : undefined)),
-  email: z.string().email("Enter a valid email address."),
-  password: z
+export const changePasswordSchema = z.object({
+  newPassword: z
     .string()
     .min(8, "Password must be at least 8 characters.")
     .max(72, "Password must be at most 72 characters."),
 });
 
-export type SignupInput = z.input<typeof signupSchema>;
+export type ChangePasswordInput = z.input<typeof changePasswordSchema>;
+
+export const changePasswordFormSchema = changePasswordSchema
+  .extend({
+    confirmPassword: z.string().min(1, "Please confirm the password."),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords do not match.",
+    path: ["confirmPassword"],
+  });
+
+export type ChangePasswordFormInput = z.input<typeof changePasswordFormSchema>;
