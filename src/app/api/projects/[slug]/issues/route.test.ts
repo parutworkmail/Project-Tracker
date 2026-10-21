@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authMock, projectFindUnique, listIssues, createIssue } = vi.hoisted(
-  () => ({
+const { authMock, projectFindUnique, listIssues, createIssue, canAccessProject } =
+  vi.hoisted(() => ({
     authMock: vi.fn(),
     projectFindUnique: vi.fn(),
     listIssues: vi.fn(),
     createIssue: vi.fn(),
-  })
-);
+    canAccessProject: vi.fn(),
+  }));
 
 vi.mock("@/auth", () => ({ auth: authMock }));
 
@@ -20,6 +20,10 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/lib/projectSchema", () => ({
   listIssues,
   createIssue,
+}));
+
+vi.mock("@/lib/permissions", () => ({
+  canAccessProject,
 }));
 
 import { GET, POST } from "./route";
@@ -36,7 +40,7 @@ function jsonRequest(body: unknown) {
   });
 }
 
-const member = { userId: "user-1", role: "MEMBER" };
+const member = { userId: "user-1" };
 const project = { id: "p1", schemaName: "proj_abc", members: [member] };
 
 describe("GET /api/projects/[slug]/issues", () => {
@@ -44,6 +48,7 @@ describe("GET /api/projects/[slug]/issues", () => {
     authMock.mockReset();
     projectFindUnique.mockReset();
     listIssues.mockReset();
+    canAccessProject.mockReset();
   });
 
   it("returns 401 when there is no session", async () => {
@@ -55,7 +60,7 @@ describe("GET /api/projects/[slug]/issues", () => {
   });
 
   it("returns 404 when the project doesn't exist", async () => {
-    authMock.mockResolvedValue({ user: { id: "user-1" } });
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
     projectFindUnique.mockResolvedValue(null);
 
     const response = await GET(new Request("http://localhost"), params("x"));
@@ -63,9 +68,10 @@ describe("GET /api/projects/[slug]/issues", () => {
     expect(response.status).toBe(404);
   });
 
-  it("returns 403 when the caller is not a project member", async () => {
-    authMock.mockResolvedValue({ user: { id: "outsider" } });
+  it("returns 403 when the caller cannot access the project", async () => {
+    authMock.mockResolvedValue({ user: { id: "outsider", role: "USER" } });
     projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(false);
 
     const response = await GET(new Request("http://localhost"), params("x"));
 
@@ -74,8 +80,9 @@ describe("GET /api/projects/[slug]/issues", () => {
   });
 
   it("lists issues scoped to the project's schema for a member", async () => {
-    authMock.mockResolvedValue({ user: { id: "user-1" } });
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
     projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(true);
     listIssues.mockResolvedValue([{ id: "i1", title: "Bug" }]);
 
     const response = await GET(new Request("http://localhost"), params("x"));
@@ -85,6 +92,23 @@ describe("GET /api/projects/[slug]/issues", () => {
     expect(body).toEqual([{ id: "i1", title: "Bug" }]);
     expect(listIssues).toHaveBeenCalledWith("proj_abc");
   });
+
+  it("allows a super admin who is not a member to list issues", async () => {
+    authMock.mockResolvedValue({ user: { id: "super-1", role: "SUPER_ADMIN" } });
+    projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(true);
+    listIssues.mockResolvedValue([]);
+
+    const response = await GET(new Request("http://localhost"), params("x"));
+
+    expect(response.status).toBe(200);
+    expect(canAccessProject).toHaveBeenCalledWith(
+      "super-1",
+      "SUPER_ADMIN",
+      "p1",
+      false
+    );
+  });
 });
 
 describe("POST /api/projects/[slug]/issues", () => {
@@ -92,6 +116,7 @@ describe("POST /api/projects/[slug]/issues", () => {
     authMock.mockReset();
     projectFindUnique.mockReset();
     createIssue.mockReset();
+    canAccessProject.mockReset();
   });
 
   it("returns 401 when there is no session", async () => {
@@ -102,9 +127,10 @@ describe("POST /api/projects/[slug]/issues", () => {
     expect(response.status).toBe(401);
   });
 
-  it("returns 403 when the caller is not a project member", async () => {
-    authMock.mockResolvedValue({ user: { id: "outsider" } });
+  it("returns 403 when the caller cannot access the project", async () => {
+    authMock.mockResolvedValue({ user: { id: "outsider", role: "USER" } });
     projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(false);
 
     const response = await POST(jsonRequest({ title: "Bug" }), params("x"));
 
@@ -113,8 +139,9 @@ describe("POST /api/projects/[slug]/issues", () => {
   });
 
   it("returns 400 on an invalid payload", async () => {
-    authMock.mockResolvedValue({ user: { id: "user-1" } });
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
     projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(true);
 
     const response = await POST(jsonRequest({ title: "" }), params("x"));
 
@@ -123,8 +150,9 @@ describe("POST /api/projects/[slug]/issues", () => {
   });
 
   it("creates the issue scoped to the project's schema, attributed to the caller", async () => {
-    authMock.mockResolvedValue({ user: { id: "user-1" } });
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
     projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(true);
     createIssue.mockResolvedValue({ id: "i1", title: "Bug" });
 
     const response = await POST(
@@ -143,8 +171,9 @@ describe("POST /api/projects/[slug]/issues", () => {
   });
 
   it("normalizes an empty description to null", async () => {
-    authMock.mockResolvedValue({ user: { id: "user-1" } });
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
     projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(true);
     createIssue.mockResolvedValue({ id: "i1", title: "Bug" });
 
     await POST(jsonRequest({ title: "Bug", description: "" }), params("x"));

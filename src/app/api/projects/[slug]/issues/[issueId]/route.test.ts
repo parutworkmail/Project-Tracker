@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authMock, projectFindUnique, updateIssueStatus } = vi.hoisted(() => ({
-  authMock: vi.fn(),
-  projectFindUnique: vi.fn(),
-  updateIssueStatus: vi.fn(),
-}));
+const { authMock, projectFindUnique, updateIssueStatus, canAccessProject } =
+  vi.hoisted(() => ({
+    authMock: vi.fn(),
+    projectFindUnique: vi.fn(),
+    updateIssueStatus: vi.fn(),
+    canAccessProject: vi.fn(),
+  }));
 
 vi.mock("@/auth", () => ({ auth: authMock }));
 
@@ -15,6 +17,8 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 vi.mock("@/lib/projectSchema", () => ({ updateIssueStatus }));
+
+vi.mock("@/lib/permissions", () => ({ canAccessProject }));
 
 import { PATCH } from "./route";
 
@@ -30,7 +34,7 @@ function jsonRequest(body: unknown) {
   });
 }
 
-const member = { userId: "user-1", role: "MEMBER" };
+const member = { userId: "user-1" };
 const project = { id: "p1", schemaName: "proj_abc", members: [member] };
 
 describe("PATCH /api/projects/[slug]/issues/[issueId]", () => {
@@ -38,6 +42,7 @@ describe("PATCH /api/projects/[slug]/issues/[issueId]", () => {
     authMock.mockReset();
     projectFindUnique.mockReset();
     updateIssueStatus.mockReset();
+    canAccessProject.mockReset();
   });
 
   it("returns 401 when there is no session", async () => {
@@ -52,7 +57,7 @@ describe("PATCH /api/projects/[slug]/issues/[issueId]", () => {
   });
 
   it("returns 404 when the project doesn't exist", async () => {
-    authMock.mockResolvedValue({ user: { id: "user-1" } });
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
     projectFindUnique.mockResolvedValue(null);
 
     const response = await PATCH(
@@ -63,9 +68,10 @@ describe("PATCH /api/projects/[slug]/issues/[issueId]", () => {
     expect(response.status).toBe(404);
   });
 
-  it("returns 403 when the caller is not a project member", async () => {
-    authMock.mockResolvedValue({ user: { id: "outsider" } });
+  it("returns 403 when the caller cannot access the project", async () => {
+    authMock.mockResolvedValue({ user: { id: "outsider", role: "USER" } });
     projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(false);
 
     const response = await PATCH(
       jsonRequest({ status: "done" }),
@@ -77,8 +83,9 @@ describe("PATCH /api/projects/[slug]/issues/[issueId]", () => {
   });
 
   it("returns 400 on an invalid status", async () => {
-    authMock.mockResolvedValue({ user: { id: "user-1" } });
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
     projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(true);
 
     const response = await PATCH(
       jsonRequest({ status: "archived" }),
@@ -90,8 +97,9 @@ describe("PATCH /api/projects/[slug]/issues/[issueId]", () => {
   });
 
   it("updates the issue status scoped to the project's schema", async () => {
-    authMock.mockResolvedValue({ user: { id: "user-1" } });
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
     projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(true);
     updateIssueStatus.mockResolvedValue({ id: "i1", status: "done" });
 
     const response = await PATCH(
@@ -103,5 +111,25 @@ describe("PATCH /api/projects/[slug]/issues/[issueId]", () => {
     expect(response.status).toBe(200);
     expect(body).toEqual({ id: "i1", status: "done" });
     expect(updateIssueStatus).toHaveBeenCalledWith("proj_abc", "i1", "done");
+  });
+
+  it("allows an assigned admin who is not a member to update the issue", async () => {
+    authMock.mockResolvedValue({ user: { id: "admin-1", role: "ADMIN" } });
+    projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(true);
+    updateIssueStatus.mockResolvedValue({ id: "i1", status: "done" });
+
+    const response = await PATCH(
+      jsonRequest({ status: "done" }),
+      params("x", "i1")
+    );
+
+    expect(response.status).toBe(200);
+    expect(canAccessProject).toHaveBeenCalledWith(
+      "admin-1",
+      "ADMIN",
+      "p1",
+      false
+    );
   });
 });

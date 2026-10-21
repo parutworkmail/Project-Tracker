@@ -70,7 +70,7 @@ describe("POST /api/projects/[slug]/join", () => {
     expect(projectMemberUpsert).not.toHaveBeenCalled();
   });
 
-  it("upserts a MEMBER-role membership for the caller and returns ok", async () => {
+  it("upserts a membership for the caller and returns ok", async () => {
     authMock.mockResolvedValue({ user: { id: "user-1" } });
     projectFindUnique.mockResolvedValue({ id: "p1" });
     projectMemberUpsert.mockResolvedValue({});
@@ -85,12 +85,12 @@ describe("POST /api/projects/[slug]/join", () => {
     expect(body).toEqual({ ok: true });
     expect(projectMemberUpsert).toHaveBeenCalledWith({
       where: { projectId_userId: { projectId: "p1", userId: "user-1" } },
-      create: { projectId: "p1", userId: "user-1", role: "MEMBER" },
+      create: { projectId: "p1", userId: "user-1" },
       update: {},
     });
   });
 
-  it("does not downgrade an existing member's role (empty update payload)", async () => {
+  it("does not modify an existing membership (empty update payload)", async () => {
     authMock.mockResolvedValue({ user: { id: "user-1" } });
     projectFindUnique.mockResolvedValue({ id: "p1" });
     projectMemberUpsert.mockResolvedValue({});

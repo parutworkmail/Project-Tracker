@@ -48,7 +48,6 @@ export async function POST(
     create: {
       projectId: project.id,
       userId: session.user.id,
-      role: "MEMBER",
     },
     update: {},
   });

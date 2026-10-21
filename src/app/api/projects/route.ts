@@ -6,6 +6,7 @@ import { buildUniqueSlug } from "@/lib/slug";
 import { generateSchemaName, provisionProjectSchema } from "@/lib/projectSchema";
 import { createProjectSchema } from "@/lib/validation/project";
 import { checkRateLimit } from "@/lib/rateLimit";
+import { canCreateProject } from "@/lib/permissions";
 
 const CREATE_PROJECT_LIMIT = 10;
 const CREATE_PROJECT_WINDOW_MS = 60 * 60 * 1000;
@@ -28,7 +29,6 @@ export async function GET() {
       id: m.project.id,
       name: m.project.name,
       slug: m.project.slug,
-      role: m.role,
     }))
   );
 }
@@ -38,6 +38,13 @@ export async function POST(request: Request) {
 
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!canCreateProject(session.user.role)) {
+    return NextResponse.json(
+      { error: "Only super admins can create projects." },
+      { status: 403 }
+    );
   }
 
   const rateLimit = await checkRateLimit(
@@ -77,11 +84,10 @@ export async function POST(request: Request) {
       name,
       slug,
       schemaName,
-      ownerId: session.user.id,
+      createdById: session.user.id,
       members: {
         create: {
           userId: session.user.id,
-          role: "OWNER",
         },
       },
     },

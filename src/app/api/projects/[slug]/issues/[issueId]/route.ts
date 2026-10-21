@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { updateIssueStatus } from "@/lib/projectSchema";
 import { updateIssueStatusSchema } from "@/lib/validation/project";
+import { canAccessProject } from "@/lib/permissions";
 
 export async function PATCH(
   request: Request,
@@ -30,7 +31,14 @@ export async function PATCH(
     (m) => m.userId === session.user.id
   );
 
-  if (!membership) {
+  const canAccess = await canAccessProject(
+    session.user.id,
+    session.user.role,
+    project.id,
+    !!membership
+  );
+
+  if (!canAccess) {
     return NextResponse.json({ error: "Not a member" }, { status: 403 });
   }
 

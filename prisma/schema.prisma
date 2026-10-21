@@ -12,21 +12,30 @@ datasource db {
   provider = "postgresql"
 }
 
+enum GlobalRole {
+  SUPER_ADMIN
+  ADMIN
+  USER
+}
+
 model User {
-  id                  String    @id @default(cuid())
+  id                  String     @id @default(cuid())
   name                String?
-  email               String    @unique
+  email               String     @unique
   emailVerified       DateTime?
   image               String?
   password            String?
-  failedLoginAttempts Int       @default(0)
+  role                GlobalRole @default(USER)
+  failedLoginAttempts Int        @default(0)
   lockedUntil         DateTime?
   accounts            Account[]
   sessions            Session[]
-  ownedProjects       Project[]       @relation("ProjectOwner")
+  createdProjects     Project[]       @relation("ProjectCreator")
   memberships         ProjectMember[]
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  adminAssignments    ProjectAdmin[]  @relation("ProjectAdminUser")
+  assignmentsMade     ProjectAdmin[]  @relation("ProjectAdminAssignedBy")
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 }
 
 model Account {
@@ -65,32 +74,41 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-enum ProjectRole {
-  OWNER
-  MEMBER
-}
-
 model Project {
   id         String          @id @default(cuid())
   name       String
   slug       String          @unique
   schemaName String          @unique
-  ownerId    String
-  owner      User            @relation("ProjectOwner", fields: [ownerId], references: [id])
+  createdById String
+  createdBy  User            @relation("ProjectCreator", fields: [createdById], references: [id])
   members    ProjectMember[]
+  admins     ProjectAdmin[]
   createdAt  DateTime        @default(now())
   updatedAt  DateTime        @updatedAt
 }
 
 model ProjectMember {
-  id        String      @id @default(cuid())
+  id        String   @id @default(cuid())
   projectId String
   userId    String
-  role      ProjectRole @default(MEMBER)
-  createdAt DateTime    @default(now())
+  createdAt DateTime @default(now())
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+}
+
+model ProjectAdmin {
+  id         String   @id @default(cuid())
+  projectId  String
+  userId     String
+  assignedById String
+  createdAt  DateTime @default(now())
+
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user       User    @relation("ProjectAdminUser", fields: [userId], references: [id], onDelete: Cascade)
+  assignedBy User    @relation("ProjectAdminAssignedBy", fields: [assignedById], references: [id])
 
   @@unique([projectId, userId])
 }

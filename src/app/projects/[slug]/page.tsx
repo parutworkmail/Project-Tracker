@@ -3,9 +3,11 @@ import { redirect, notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { listIssues } from "@/lib/projectSchema";
+import { canManageProject } from "@/lib/permissions";
 import { JoinProjectButton } from "@/components/join-project-button";
 import { CreateIssueForm } from "@/components/create-issue-form";
 import { IssueCard } from "@/components/issue-card";
+import { ProjectManageControls } from "@/components/project-manage-controls";
 
 export const instant = false;
 
@@ -35,7 +37,13 @@ export default async function ProjectPage({
     (m) => m.userId === session.user.id
   );
 
-  if (!membership) {
+  const canManage = await canManageProject(
+    session.user.id,
+    session.user.role,
+    project.id
+  );
+
+  if (!membership && !canManage) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 dark:bg-black">
         <h1 className="mb-6 text-2xl font-semibold">{project.name}</h1>
@@ -56,6 +64,12 @@ export default async function ProjectPage({
             {project.members.length !== 1 ? "s" : ""}
           </span>
         </div>
+
+        {canManage && (
+          <div className="mb-4">
+            <ProjectManageControls slug={project.slug} name={project.name} />
+          </div>
+        )}
 
         <p className="mb-8 text-sm text-zinc-500">
           Shareable link:{" "}

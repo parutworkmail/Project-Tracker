@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { createIssue, listIssues } from "@/lib/projectSchema";
 import { createIssueSchema } from "@/lib/validation/project";
+import { canAccessProject } from "@/lib/permissions";
 
 async function getMembership(slug: string, userId: string) {
   const project = await prisma.project.findUnique({
@@ -36,7 +37,14 @@ export async function GET(
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  if (!membership) {
+  const canAccess = await canAccessProject(
+    session.user.id,
+    session.user.role,
+    project.id,
+    !!membership
+  );
+
+  if (!canAccess) {
     return NextResponse.json({ error: "Not a member" }, { status: 403 });
   }
 
@@ -61,7 +69,14 @@ export async function POST(
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  if (!membership) {
+  const canAccess = await canAccessProject(
+    session.user.id,
+    session.user.role,
+    project.id,
+    !!membership
+  );
+
+  if (!canAccess) {
     return NextResponse.json({ error: "Not a member" }, { status: 403 });
   }
 

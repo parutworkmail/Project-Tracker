@@ -2,7 +2,116 @@
 
 Read this file first in any new session to see what's done and what's next.
 
+### Live Task Log
+(Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
+Logging". Shows exactly what was happening if the last session crashed.)
+
+- **Plan**: (none in progress)
+- **Status**: idle.
+- **Next**: none — awaiting next user request. Last completed work: 3-tier
+  global role (SUPER_ADMIN/ADMIN/USER) RBAC feature, verified clean
+  (tsc/lint/build/159 tests/agent validator), not yet committed — see
+  "Session: Global role-based access control" below for full details.
+
 ## Status: core app complete, keep-alive cron added
+
+## Session: Global role-based access control (SUPER_ADMIN/ADMIN/USER)
+Replaced the old per-project `ProjectRole` (OWNER/MEMBER) model entirely
+with a 3-tier global role system, per user request. Session crashed
+partway through; resumed and verified actual repo state via
+git status/diff + tsc + test run before continuing (per the new
+Crash-Safe Task Logging rule in CLAUDE.md) rather than trusting the
+live-log text, which turned out to be behind the real (further along)
+state on disk.
+
+### Spec (clarified via ask_user before coding)
+- `GlobalRole` enum on `User.role`: `SUPER_ADMIN` / `ADMIN` / `USER`
+  (default `USER`).
+- Old `ProjectRole` enum removed entirely — `ProjectMember` is now a plain
+  join table (membership = "is in the list", no role column).
+- New `ProjectAdmin` model: many-to-many project↔admin assignments
+  (multiple admins per project allowed), only a `SUPER_ADMIN` can
+  create/remove them. `Project.ownerId`/`owner` renamed to
+  `createdById`/`createdBy` (creation record, not a permission).
+- Permissions (`src/lib/permissions.ts`): project CREATE = `SUPER_ADMIN`
+  only. Project EDIT/DELETE = `SUPER_ADMIN` (any project) OR an `ADMIN`
+  assigned to that specific project. Issue view/create/update = project
+  member OR anyone who can manage the project (so an assigned admin
+  doesn't need to separately join). `USER` = normal member behavior only,
+  can't create projects or manage any project.
+- New `/admin` page (SUPER_ADMIN-gated, others redirected to `/dashboard`):
+  user list with a role-change dropdown (can't change own role — avoids
+  any self-lockout path), project list with admin assign/unassign.
+- `/projects/[slug]` page: inline rename + delete-with-confirm shown to
+  whoever `canManageProject` returns true for.
+- First `SUPER_ADMIN`: user chose manual DB promotion (no env-var
+  auto-bootstrap) — SQL given below, to run once after this is deployed.
+
+### Implementation
+- `prisma/schema.prisma` + migration
+  `20261021072726_add_global_roles_and_project_admins` (applied to the
+  real Supabase DB): `GlobalRole` enum, `User.role`, `ProjectAdmin` model,
+  `ProjectMember` role column dropped, `Project.ownerId`→`createdById`.
+- `src/auth.ts` + `src/types/next-auth.d.ts`: session now carries
+  `user.role`, re-fetched fresh from the DB on every `session()` callback
+  (not baked into the JWT at login) — a role change by a super admin takes
+  effect on the user's very next request, no re-login needed.
+- New `src/lib/permissions.ts`: `isSuperAdmin`, `canCreateProject`,
+  `isAssignedProjectAdmin`, `canManageProject`, `canAccessProject`.
+- New `src/lib/validation/admin.ts` (`updateUserRoleSchema`,
+  `assignProjectAdminSchema`) and `updateProjectSchema` added to
+  `src/lib/validation/project.ts`.
+- Rewrote `src/app/api/projects/route.ts` (POST gated to `SUPER_ADMIN`),
+  `src/app/api/projects/[slug]/route.ts` (GET returns
+  `isMember`/`canManage`; added PATCH rename + DELETE which also drops the
+  project's Postgres schema), `.../join/route.ts` (dropped the removed
+  role field), `.../issues/route.ts` and `.../issues/[issueId]/route.ts`
+  (membership gate → `canAccessProject`).
+- New admin API: `GET /api/admin/users`, `PATCH
+  /api/admin/users/[userId]` (blocks self-role-change), `GET
+  /api/admin/projects`, `POST /api/admin/projects/[slug]/admins` (only
+  allows assigning users who already hold the `ADMIN` role; rejects
+  `SUPER_ADMIN` targets as redundant and `USER` targets as invalid),
+  `DELETE /api/admin/projects/[slug]/admins/[userId]`.
+- New `/admin` page + `UserRoleManager`/`ProjectAdminManager` components;
+  `ProjectManageControls` component on the project page; `dashboard/page.tsx`
+  and `nav.tsx` updated to only show project-creation/admin-console UI to
+  `SUPER_ADMIN`.
+
+### Verification
+- `npx tsc --noEmit` clean.
+- `npm run lint` clean (same pre-existing unrelated `.axet-code/tmp`
+  warnings only).
+- `npm test` → **159/159 passing** (133 previous + 26 new: 11 in
+  `permissions.test.ts` + 15 across the 5 new admin route test files).
+- `npm run build` succeeds; all new routes (`/admin`,
+  `/api/admin/users[/...]`, `/api/admin/projects[/...]`) registered
+  correctly alongside existing ones.
+- Independent agent validator reviewed the full feature for privilege
+  escalation, self-demotion/lockout risk, leftover references to the
+  removed `ProjectRole`/`ownerId`, argument-order bugs in
+  `canManageProject`/`canAccessProject` call sites, the admin-assignment
+  business rules, frontend/backend contract matches, N+1 queries, and test
+  coverage gaps. **Verdict: no issues found.** Two non-blocking
+  observations noted (both intentional, not bugs): (1) the dashboard
+  project list is membership-only, so a super admin/assigned admin who
+  manages but hasn't joined a project won't see it there (they can still
+  reach it directly via its URL — the project page itself checks
+  `canManageProject`, not just membership); (2) the join endpoint has no
+  permission gate by design — any authenticated user can join any project
+  via its shareable slug link, unchanged from before this feature.
+
+### Not yet done
+- Not committed yet — ask user first (per rule: never commit unless
+  explicitly asked).
+- First `SUPER_ADMIN` bootstrap SQL (run once, manually, against the real
+  Supabase DB, after replacing the email):
+  ```sql
+  UPDATE "User" SET role = 'SUPER_ADMIN' WHERE email = 'you@example.com';
+  ```
+- Possible follow-up (not requested, mentioning only): surface
+  super-admin/assigned-admin-managed-but-not-member projects in the
+  dashboard list too, if that UX gap turns out to matter in practice.
 
 ### Decision log: next-auth vs better-auth (verified, NOT migrating)
 A prior (crashed, unlogged) session apparently recommended switching from

@@ -18,6 +18,11 @@ export function Nav() {
             <Link href="/dashboard" className="hover:underline">
               Dashboard
             </Link>
+            {session.user?.role === "SUPER_ADMIN" && (
+              <Link href="/admin" className="hover:underline">
+                Admin
+              </Link>
+            )}
             <span className="text-zinc-500">{session.user?.email}</span>
             <button
               onClick={() => signOut({ callbackUrl: "/" })}

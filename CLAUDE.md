@@ -4,6 +4,34 @@
 Read `PROGRESS.md` first — it tracks what's done, known loose ends, and next
 steps across sessions. Update it after each meaningful change.
 
+## Crash-Safe Task Logging (log BEFORE acting, not after — read every session)
+A session can crash mid-task with zero warning. Logging only at the end of a
+session is not good enough — if the crash happens mid-task, nothing was ever
+written down and the next session can't tell what was left mid-flight. So:
+
+1. Before starting ANY non-trivial task/step (writing code, running a
+   migration, a long command, etc.), first write/update a `### Live Task Log`
+   section at the TOP of `PROGRESS.md` with:
+   - **Plan**: what I'm about to do, in 1-3 lines.
+   - **Status**: `in progress`.
+2. Only after that log entry is written, actually execute the step.
+3. Immediately when the step finishes (success or failure), update the SAME
+   entry:
+   - **Status**: `done` / `failed` / `blocked`, plus the result in 1-2 lines.
+   - **Next**: what happens next (next step, or "none — task complete").
+4. Keep only the most recent 1-3 entries in `### Live Task Log` (it's a
+   scratchpad for crash recovery, not a permanent history) — once a whole
+   user-level task is finished and verified, fold the summary into the
+   normal dated `## Session: ...` sections below it and clear the live log
+   back to a single "idle" line.
+5. On resuming any session (including after a crash), read `### Live Task
+   Log` FIRST, before anything else — if it shows an `in progress` entry,
+   that's exactly where the last session died; verify current repo state
+   (git status/diff, test run) against that entry before continuing.
+
+This applies on top of (not instead of) the existing end-of-change
+`PROGRESS.md` updates and the Agent Timeout rule below.
+
 ## Rules
 
 1. If unsure or have any question, ASK FIRST until fully understood before acting.

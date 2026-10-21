@@ -57,11 +57,10 @@ describe("GET /api/projects", () => {
     expect(projectMemberFindMany).not.toHaveBeenCalled();
   });
 
-  it("returns the user's projects with their role, scoped by userId", async () => {
-    authMock.mockResolvedValue({ user: { id: "user-1" } });
+  it("returns the user's projects, scoped by userId", async () => {
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
     projectMemberFindMany.mockResolvedValue([
       {
-        role: "OWNER",
         project: { id: "p1", name: "Proj One", slug: "proj-one-ab12cd" },
       },
     ]);
@@ -71,7 +70,7 @@ describe("GET /api/projects", () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual([
-      { id: "p1", name: "Proj One", slug: "proj-one-ab12cd", role: "OWNER" },
+      { id: "p1", name: "Proj One", slug: "proj-one-ab12cd" },
     ]);
     expect(projectMemberFindMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { userId: "user-1" } })
@@ -89,8 +88,37 @@ describe("POST /api/projects", () => {
     checkRateLimit.mockResolvedValue({ allowed: true, retryAfterMs: 0 });
   });
 
+  it("returns 401 when there is no session", async () => {
+    authMock.mockResolvedValue(null);
+
+    const response = await POST(jsonRequest({ name: "New Project" }));
+
+    expect(response.status).toBe(401);
+    expect(provisionProjectSchema).not.toHaveBeenCalled();
+    expect(projectCreate).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when the caller is a plain USER (not a super admin)", async () => {
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
+
+    const response = await POST(jsonRequest({ name: "New Project" }));
+
+    expect(response.status).toBe(403);
+    expect(provisionProjectSchema).not.toHaveBeenCalled();
+    expect(projectCreate).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 when the caller is an ADMIN (not a super admin)", async () => {
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "ADMIN" } });
+
+    const response = await POST(jsonRequest({ name: "New Project" }));
+
+    expect(response.status).toBe(403);
+    expect(provisionProjectSchema).not.toHaveBeenCalled();
+  });
+
   it("returns 429 with Retry-After when the user has exceeded the create-project rate limit", async () => {
-    authMock.mockResolvedValue({ user: { id: "user-1" } });
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "SUPER_ADMIN" } });
     checkRateLimit.mockResolvedValue({ allowed: false, retryAfterMs: 120_000 });
 
     const response = await POST(jsonRequest({ name: "New Project" }));
@@ -102,18 +130,8 @@ describe("POST /api/projects", () => {
     expect(provisionProjectSchema).not.toHaveBeenCalled();
   });
 
-  it("returns 401 when there is no session", async () => {
-    authMock.mockResolvedValue(null);
-
-    const response = await POST(jsonRequest({ name: "New Project" }));
-
-    expect(response.status).toBe(401);
-    expect(provisionProjectSchema).not.toHaveBeenCalled();
-    expect(projectCreate).not.toHaveBeenCalled();
-  });
-
   it("returns 400 on an invalid payload", async () => {
-    authMock.mockResolvedValue({ user: { id: "user-1" } });
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "SUPER_ADMIN" } });
 
     const response = await POST(jsonRequest({ name: "" }));
 
@@ -121,8 +139,8 @@ describe("POST /api/projects", () => {
     expect(provisionProjectSchema).not.toHaveBeenCalled();
   });
 
-  it("provisions a schema, creates the project with the caller as OWNER, returns 201", async () => {
-    authMock.mockResolvedValue({ user: { id: "user-1" } });
+  it("provisions a schema, creates the project with the super admin as creator+member, returns 201", async () => {
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "SUPER_ADMIN" } });
     projectCreate.mockResolvedValue({
       id: "p1",
       name: "New Project",
@@ -142,10 +160,9 @@ describe("POST /api/projects", () => {
 
     const createArgs = projectCreate.mock.calls[0][0];
     expect(createArgs.data.name).toBe("New Project");
-    expect(createArgs.data.ownerId).toBe("user-1");
+    expect(createArgs.data.createdById).toBe("user-1");
     expect(createArgs.data.members.create).toEqual({
       userId: "user-1",
-      role: "OWNER",
     });
   });
 });
