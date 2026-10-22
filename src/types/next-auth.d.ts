@@ -8,6 +8,7 @@ declare module "next-auth" {
       username: string;
       role: GlobalRole;
       mustChangePassword: boolean;
+      dbUnavailable?: boolean;
     } & DefaultSession["user"];
   }
 }

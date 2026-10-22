@@ -6,17 +6,55 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
-- **Plan**: User flagged that I've been running the full
-  tsc/lint/build/test/agent-validator sweep after every small
-  development step, which is slow and wasteful. Wants a lighter
-  validation loop while developing — only full-validate right before a
-  push. Updated `CLAUDE.md` with a new "Validation tiers" rule: tsc-only
-  (or targeted single-test-file runs) while iterating; full
-  tsc+lint+build+full-test+(optional validator) only right before a
-  push or when explicitly asked.
-- **Status**: done.
-- **Next**: none — task complete. Applying lighter validation from now
-  on for in-progress feature work.
+- **Plan**: User correctly called out a real coverage gap: the previous
+  "graceful DB-connection error handling" session only wrapped the 12
+  REST API routes, NOT the login path. Reproduced it live: a test login
+  POST against `/api/auth/callback/credentials` redirected to NextAuth's
+  own generic `/api/auth/error?error=Configuration` page — meaning any
+  unexpected error inside `authorize()` (including a DB failure from
+  `checkRateLimit()`, which runs BEFORE the username/password check)
+  gets silently reclassified by NextAuth itself, never reaching my 503
+  JSON logic at all. Also found via the same test that `/api/cron/
+  keep-alive` still returns 401 even with the exact `CRON_SECRET` from
+  local `.env` — meaning the value configured on Vercel doesn't match
+  (likely copy-paste whitespace or scope issue), separate from this
+  bug, not yet resolved. Fix plan for the login gap: (1) `src/auth.ts`
+  `authorize()`'s catch block — add `isDbConnectionError(error)` check
+  (reusing the existing `src/lib/apiError.ts` helper) → throw a new
+  `DbUnavailableSignInError` (code `db-unavailable`); anything still
+  unclassified → new `UnexpectedSignInError` (code `unexpected-error`)
+  instead of the previous bare `throw error` that NextAuth was
+  swallowing. (2) `src/app/login/page.tsx` — handle both new codes with
+  clear, distinct messages. (3) Same root issue exists in the
+  `session()` callback (runs on EVERY `auth()` call on EVERY protected
+  page, not just login) — make it resilient: catch DB errors there too,
+  set a new `session.user.dbUnavailable` flag instead of crashing, and
+  show a visible red banner in `Nav` (rendered on every page) when that
+  flag is true. (4) tsc-only validation (per the new lighter dev-time
+  workflow — no full build/test/validator for this step).
+- **Status**: done. All 4 steps implemented:
+  `DbUnavailableSignInError`/`UnexpectedSignInError` added to
+  `src/auth.ts`, both `authorize()` and `session()` now classify DB
+  errors via `isDbConnectionError` instead of leaking to NextAuth's
+  generic handling. `src/types/next-auth.d.ts` gained
+  `dbUnavailable?: boolean` on `Session.user`. `src/app/login/page.tsx`
+  shows a specific message for `db-unavailable`/`unexpected-error`.
+  `src/components/nav.tsx` shows a persistent red banner on every
+  authenticated page when `session.user.dbUnavailable` is true.
+  `npx tsc --noEmit` clean (no full build/test run per the new
+  lighter-validation workflow — reserved for right before a push).
+- **Next**: tell the user this is fixed but not yet committed/pushed;
+  also still need to resolve the separate `CRON_SECRET` mismatch found
+  during testing (Vercel's value doesn't match local `.env` — ask user
+  to re-check/re-paste it, likely trailing whitespace from copy-paste).
+
+## Session: Validation-tiers workflow change
+User flagged that I ran the full tsc/lint/build/test/agent-validator
+sweep after every small development step, which was slow and wasteful.
+Updated `CLAUDE.md` with a new "Validation tiers" rule: tsc-only (or
+targeted single-test-file runs) while iterating on a feature; full
+tsc+lint+build+full-test+(optional validator) only right before a
+push or when explicitly asked.
 
 ## Session: Graceful DB-connection error handling
 User asked why the deploy "just shows the site" with no error when the

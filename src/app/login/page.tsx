@@ -47,6 +47,14 @@ function LoginForm() {
         );
       } else if (result.code === "rate-limited") {
         setFormError("Too many login attempts. Please try again later.");
+      } else if (result.code === "db-unavailable") {
+        setFormError(
+          "Cannot reach the database right now. Please try again shortly, or contact an admin if this persists."
+        );
+      } else if (result.code === "unexpected-error") {
+        setFormError(
+          "An unexpected error occurred while logging in. Please try again."
+        );
       } else {
         setFormError("Invalid username or password.");
       }
