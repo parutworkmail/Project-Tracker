@@ -6,10 +6,61 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
-- **Plan**: (none in progress)
-- **Status**: idle.
-- **Next**: none — awaiting next user request. Last completed work:
-  SUPER_ADMIN "delete user" feature, committed `46580e7` on `main`.
+- **Plan**: User forked the repo to their personal GitHub account; new
+  remote is `https://github.com/parutworkmail/Project-Tracker.git`
+  (replaces old `https://github.com/bardtestbard5-maker/Project-Tracker.git`).
+  Wants the git remote updated and any hardcoded references to the old
+  repo path fixed across the project. Plan: (1) update `git remote set-url
+  origin` to the new URL, (2) grep the whole repo (not just src/) for the
+  old owner name `bardtestbard5-maker` and the old repo URL to find any
+  hardcoded references (README, package.json repository field,
+  vercel.json, CI config, project.md, CLAUDE.md, PROGRESS.md itself),
+  (3) fix each one found, (4) verify `git remote -v` and that `git fetch`
+  works against the new remote, (5) report back what the user still
+  needs to do themselves (Vercel project reconnect/re-import if deployed,
+  any GitHub Actions secrets, collaborator access, etc. — these require
+  the user's own GitHub/Vercel dashboard access, not something I can do
+  from here).
+- **Status**: done. `git remote set-url origin
+  https://github.com/parutworkmail/Project-Tracker.git` applied, verified
+  via `git remote -v` and `.git/config`. Grepped the whole repo (not
+  just `src/`) for the old owner name and old repo URL — zero hardcoded
+  references found anywhere in actual code/config (package.json has no
+  `repository`/`homepage`/`bugs` fields, `vercel.json` has none either).
+  Confirmed connectivity with `git fetch origin -v` — succeeded, and
+  `origin/main` is already at the same commit as local HEAD (`96f4a0a`),
+  so the fork is fully in sync already, no push needed.
+- **Next**: none — task complete. Reported to user what still needs
+  their own action (Vercel reconnect/env vars, GitHub access/secrets) —
+  see reply.
+
+- **Plan**: User's Vercel deploy fails: "Module not found: Can't resolve
+  '@/generated/prisma/client'" then build exits 1. Root cause found:
+  `.gitignore` has `/src/generated/prisma` — the Prisma-generated client
+  is NEVER committed to git. It only "works" locally because I've been
+  manually running `npx prisma generate` throughout every session this
+  whole project, leaving the generated files on disk outside git's view.
+  Vercel does a fresh clone + `npm install` + `npm run build` with none
+  of that — no generated client exists, `next build` fails on the first
+  import of it. Fix: add a `"postinstall": "prisma generate"` script to
+  `package.json` (the standard Next.js+Prisma+Vercel pattern — Vercel
+  runs `npm install` which triggers `postinstall` automatically before
+  `npm run build`). Will verify locally by deleting
+  `src/generated/prisma`, running `npm install` fresh, confirming it
+  regenerates, then running the full tsc/lint/build/test sweep before
+  pushing.
+- **Status**: done. Added `"postinstall": "prisma generate"` to
+  `package.json`. Verified the fix actually works (not just "looks
+  right"): deleted `src/generated/prisma` entirely to simulate a fresh
+  Vercel clone, ran `npm install` — confirmed `postinstall` fired and
+  regenerated the client correctly. Then ran full sweep:
+  `npx tsc --noEmit` clean, `npm test` → 186/186 passing, `npm run lint`
+  clean (same pre-existing unrelated warnings), `npm run build`
+  succeeds with the full expected route list. `package-lock.json` picked
+  up the new postinstall hook (1-line diff, no dependency changes).
+- **Next**: commit and push to `origin` (now
+  `parutworkmail/Project-Tracker`) — user explicitly asked to push this
+  time.
 
 ## Session: Delete-user admin feature
 User tested the admin console and found no way to delete a user — only
