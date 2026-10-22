@@ -6,40 +6,68 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
-- **Plan**: User pulled a real Vercel runtime log into the repo
-  (`log-vercel` file, committed as `b9b5818`) showing the actual login
-  error: `PrismaClientKnownRequestError` code `P2010`
-  ("Raw query failed...Can't reach database server"), nested
-  `DriverAdapterError: DatabaseNotReachable`. Confirms the same known
-  IPv6-connectivity root cause from before — but ALSO exposed a real
-  bug in my own classifier: `isDbConnectionError()` didn't recognize
-  `P2010`/`DatabaseNotReachable` at all, so this surfaced as the
-  generic "unexpected error" message instead of the correct "cannot
-  reach database" one. Fix: (1) add an explicit `P2010` check via
-  `error instanceof Prisma.PrismaClientKnownRequestError`, (2) add a
-  recursive `hasNestedDatabaseNotReachableCause()` walk over
-  `.meta.driverAdapterError`/`.cause` chains (since the actual
-  `DatabaseNotReachable` string is buried there, not on a top-level
-  `.code`), (3) add tests built directly from this real log's shape
-  (not guessed), (4) remove the committed `log-vercel` file from the
-  repo (it's an ad-hoc paste, not meant to be permanent, and contains
-  the real DB hostname) — tell user it's removed, they can keep a local
-  copy outside git if wanted. (5) tsc + targeted test file only (light
-  dev-time validation, not full sweep — that's reserved for next push).
-- **Status**: done. All 5 steps applied.
-  `npx tsc --noEmit` clean, `npx vitest run src/lib/apiError.test.ts` →
-  22/22 passing (4 new, built directly from the real P2010/
-  DatabaseNotReachable log shape). `git rm log-vercel` staged.
-- **Next**: commit locally (not pushing — back to the standard
-  ask-first rule, the prior push was a stated one-time exception).
-  Still waiting on the user for the actual root-cause fix: the
-  Supabase pooler hostname (Settings → Database → Connection pooling)
-  to replace the IPv6-only direct host in Vercel's `DATABASE_URL`/
-  `DIRECT_URL`. This classifier fix only makes the SAME underlying
-  connectivity failure show the correct message — it does not fix the
-  connectivity itself.
+- **Plan**: User got the Supabase Transaction Pooler connection string
+  from the "Connect" button:
+  `postgresql://postgres.deptadgzteiiiprquqah:[PASSWORD]@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres`.
+  Need to build the correct Vercel-only env var values to fix the
+  actual IPv6 connectivity root cause. Key finding before computing
+  values: this app's runtime (`src/lib/prisma.ts`) does NOT use
+  `DATABASE_URL`/`DIRECT_URL` at all — it builds the `PrismaPg` adapter
+  from discrete `SUPABASE_DB_HOST`/`PORT`/`USER`/`PASSWORD`/`NAME` env
+  vars directly. `DATABASE_URL` is only read by `prisma7.config.ts`,
+  used by the Prisma CLI (`generate`/`migrate`) which I always run from
+  my OWN local machine (already working fine via the direct host) —
+  never by Vercel at request time. So the ONLY vars that actually need
+  to change on Vercel for the live site to work are the 5
+  `SUPABASE_DB_*` ones; `DATABASE_URL`/`DIRECT_URL` on Vercel are
+  effectively unused dead weight but worth updating anyway for
+  consistency. Also checked: the pgbouncer transaction-mode "prepared
+  statement" compatibility concern (common with Prisma's native query
+  engine + raw connection strings) does NOT apply the same way to
+  `@prisma/adapter-pg`'s `pg`-driver-based approach used here — flagging
+  this as a possible-but-unlikely follow-up risk rather than guessing
+  code changes are needed now. Local `.env` stays UNCHANGED (direct
+  host is correct for local dev, which has the opposite IPv6/IPv4
+  reachability situation).
+- **Status**: in progress — about to compute and present exact values.
+- **Next**: give user the 5 updated `SUPABASE_DB_*` values (+ optional
+  `DATABASE_URL`/`DIRECT_URL` for consistency) to paste into Vercel ONLY,
+  tell them to redeploy, then re-test login once they confirm it's done.
+
+## Session: P2010/DatabaseNotReachable classifier fix (committed b5dd099)
+User pasted a real Vercel runtime log (`log-vercel` file, briefly
+committed as `b9b5818`, since removed from the repo — it contained the
+real DB hostname and was only meant as an ad-hoc diagnostic paste) that
+showed the actual login error: `PrismaClientKnownRequestError` code
+`P2010` ("Raw query failed...Can't reach database server"), with a
+nested `DriverAdapterError: DatabaseNotReachable`. This confirmed the
+same known IPv6-connectivity root cause, but ALSO exposed a real bug:
+`isDbConnectionError()` didn't recognize this shape at all, so it
+showed the generic "unexpected error" message instead of the correct
+"database unavailable" one.
+
+Fixed in `src/lib/apiError.ts`: added an explicit `P2010` check via
+`error instanceof Prisma.PrismaClientKnownRequestError`, plus a
+recursive `hasNestedDatabaseNotReachableCause()` walk over
+`.meta.driverAdapterError`/`.cause` chains (the actual
+`DatabaseNotReachable` string is buried there, not on a top-level
+`.code`). Added 4 new tests in `apiError.test.ts` built directly from
+this real log's shape (not guessed) — `npx vitest run
+src/lib/apiError.test.ts` → 22/22 passing, `npx tsc --noEmit` clean.
+Committed locally as `b5dd099`, not pushed (standard ask-first rule —
+the earlier push was a stated one-time exception, not standing).
+
+This fix only makes the SAME underlying connectivity failure show the
+correct message — it does not fix the connectivity itself. That's the
+subject of the current/next live-log entry (Supabase pooler switch).
 
 ## Session: DB connection error visibility (login + session) + Vercel DB connectivity diagnosis
+Continuing from the prior session's gap: login attempts on the live
+site were redirecting to NextAuth's own generic
+`/api/auth/error?error=Configuration` page instead of showing anything
+useful, because `authorize()`'s catch block only recognized
+`AccountLockedError`/`RateLimitedError` and rethrew everything else
+raw — which NextAuth itself swallowed before it ever reached my 503
 Continuing from the prior session's gap: login attempts on the live
 site were redirecting to NextAuth's own generic
 `/api/auth/error?error=Configuration` page instead of showing anything
