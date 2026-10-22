@@ -1,0 +1,19 @@
+Unhandled API error: Error [PrismaClientKnownRequestError]: 
+Invalid `prisma.$queryRaw()` invocation:
+
+
+Raw query failed. Code: `N/A`. Message: `Can't reach database server at db.deptadgzteiiiprquqah.supabase.co`
+    at async s (.next/server/chunks/_20lpnhhinipas._.js:1:6699)
+    at async (.next/server/chunks/[root-of-the-server]__1xh-b0_z8bs6m._.js:1:599)
+    at async Z (.next/server/chunks/_20lpnhhinipas._.js:1:2952) {
+  code: 'P2010',
+  meta: {
+    driverAdapterError: Error [DriverAdapterError]: DatabaseNotReachable
+        at T.onError (.next/server/chunks/_15b_tvg0c7mma._.js:1:7045)
+        at T.performIO (.next/server/chunks/_15b_tvg0c7mma._.js:1:6986)
+        at async T.queryRaw (.next/server/chunks/_15b_tvg0c7mma._.js:1:3968) {
+      [cause]: [Object]
+    }
+  },
+  clientVersion: '7.10.1'
+}
