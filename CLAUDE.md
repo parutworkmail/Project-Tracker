@@ -1,5 +1,15 @@
 # CLAUDE.md — Project Tracker Site
 
+## Quick facts
+- **Live deployed site**: https://project-tracker-virid-eight.vercel.app
+  — if the user asks to "open the site", this is the URL (note: this
+  agent has no browser-automation tool, so it can't literally open
+  Chrome; use `fetch`/`agentic_fetch` to check the site instead and
+  tell the user to open it themselves, or give them the link to click).
+- **GitHub repo**: https://github.com/parutworkmail/Project-Tracker.git
+  (origin remote, forked from the original to the user's personal
+  account — see PROGRESS.md "Session: repo ownership transfer").
+
 ## RULE ZERO — LOG BEFORE YOU TOUCH ANYTHING (no exceptions, read this first, every message)
 This has been violated before by treating it as optional for "small" or
 "obviously what the user asked for" actions. It is NOT optional and there
