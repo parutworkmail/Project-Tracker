@@ -6,33 +6,61 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
-- **Plan**: User got the Supabase Transaction Pooler connection string
-  from the "Connect" button:
-  `postgresql://postgres.deptadgzteiiiprquqah:[PASSWORD]@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres`.
-  Need to build the correct Vercel-only env var values to fix the
-  actual IPv6 connectivity root cause. Key finding before computing
-  values: this app's runtime (`src/lib/prisma.ts`) does NOT use
-  `DATABASE_URL`/`DIRECT_URL` at all — it builds the `PrismaPg` adapter
-  from discrete `SUPABASE_DB_HOST`/`PORT`/`USER`/`PASSWORD`/`NAME` env
-  vars directly. `DATABASE_URL` is only read by `prisma7.config.ts`,
-  used by the Prisma CLI (`generate`/`migrate`) which I always run from
-  my OWN local machine (already working fine via the direct host) —
-  never by Vercel at request time. So the ONLY vars that actually need
-  to change on Vercel for the live site to work are the 5
-  `SUPABASE_DB_*` ones; `DATABASE_URL`/`DIRECT_URL` on Vercel are
-  effectively unused dead weight but worth updating anyway for
-  consistency. Also checked: the pgbouncer transaction-mode "prepared
-  statement" compatibility concern (common with Prisma's native query
-  engine + raw connection strings) does NOT apply the same way to
-  `@prisma/adapter-pg`'s `pg`-driver-based approach used here — flagging
-  this as a possible-but-unlikely follow-up risk rather than guessing
-  code changes are needed now. Local `.env` stays UNCHANGED (direct
-  host is correct for local dev, which has the opposite IPv6/IPv4
-  reachability situation).
-- **Status**: in progress — about to compute and present exact values.
-- **Next**: give user the 5 updated `SUPABASE_DB_*` values (+ optional
-  `DATABASE_URL`/`DIRECT_URL` for consistency) to paste into Vercel ONLY,
-  tell them to redeploy, then re-test login once they confirm it's done.
+- **Plan**: (none in progress)
+- **Status**: idle.
+- **Next**: none — awaiting next user request. Last confirmed: user can
+  now log in successfully on the live Vercel deployment — see "Session:
+  Vercel DB connectivity fix (Supabase pooler)" below for full details.
+
+## Session: Vercel DB connectivity fix (Supabase pooler)
+Root cause: Supabase's direct-connection hostname
+(`db.deptadgzteiiiprquqah.supabase.co`) resolves to an IPv6 address
+only. Local dev has IPv6 connectivity, so it worked there — but Vercel
+serverless functions can only make outbound raw TCP/Postgres
+connections over IPv4, so the exact same hostname was unreachable from
+the live deployment. This was a mistake on my part from the original
+setup: I verified the direct host worked locally and assumed (without
+separately checking) that the same config would work from Vercel too.
+
+Confirmed via a real Vercel runtime log the user pasted:
+`PrismaClientKnownRequestError` code `P2010`, "Can't reach database
+server", nested `DriverAdapterError: DatabaseNotReachable`.
+
+### Fix
+User got the Transaction Pooler connection string from Supabase's
+"Connect" button:
+`postgresql://postgres.deptadgzteiiiprquqah:[PASSWORD]@aws-0-ap-northeast-1.pooler.supabase.com:6543/postgres`
+(Supabase's Supavisor pooler is IPv4-only by design, specifically for
+serverless platforms like Vercel).
+
+Found that this app's runtime (`src/lib/prisma.ts`) builds the
+`PrismaPg` adapter from discrete `SUPABASE_DB_HOST`/`PORT`/`USER`/
+`PASSWORD`/`NAME` env vars, NOT from `DATABASE_URL`/`DIRECT_URL` (those
+are only read by `prisma7.config.ts` for the Prisma CLI, which always
+runs from my local machine against the direct host — unaffected).
+Gave the user updated values for Vercel ONLY (local `.env` is correct
+as-is and was NOT changed):
+- `SUPABASE_DB_HOST` → `aws-0-ap-northeast-1.pooler.supabase.com`
+- `SUPABASE_DB_PORT` → `6543`
+- `SUPABASE_DB_USER` → `postgres.deptadgzteiiiprquqah` (pooler requires
+  the project-ref suffix)
+- `SUPABASE_DB_PASSWORD` / `SUPABASE_DB_NAME` unchanged
+- `DATABASE_URL`/`DIRECT_URL` updated too for consistency, though not
+  actually read at runtime
+
+Flagged one known caveat going in: transaction-mode pooling can reject
+server-side prepared statements, which would show as a "prepared
+statement already exists"-type error if it ever happened — noted as a
+possible but unlikely follow-up (this app uses `@prisma/adapter-pg`'s
+`pg`-driver-based query building, not Prisma's native engine, which
+reduces the risk).
+
+### Result
+**Confirmed fixed** — user updated the 5 Vercel env vars, redeployed,
+and confirmed login now works on the live site. No prepared-statement
+issue surfaced. No further action needed unless something else breaks
+later (in which case the Session pooler on port `5432` at the same
+`aws-0-...` host is the documented fallback).
 
 ## Session: P2010/DatabaseNotReachable classifier fix (committed b5dd099)
 User pasted a real Vercel runtime log (`log-vercel` file, briefly
