@@ -6,49 +6,83 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
-- **Plan**: User correctly called out a real coverage gap: the previous
-  "graceful DB-connection error handling" session only wrapped the 12
-  REST API routes, NOT the login path. Reproduced it live: a test login
-  POST against `/api/auth/callback/credentials` redirected to NextAuth's
-  own generic `/api/auth/error?error=Configuration` page — meaning any
-  unexpected error inside `authorize()` (including a DB failure from
-  `checkRateLimit()`, which runs BEFORE the username/password check)
-  gets silently reclassified by NextAuth itself, never reaching my 503
-  JSON logic at all. Also found via the same test that `/api/cron/
-  keep-alive` still returns 401 even with the exact `CRON_SECRET` from
-  local `.env` — meaning the value configured on Vercel doesn't match
-  (likely copy-paste whitespace or scope issue), separate from this
-  bug, not yet resolved. Fix plan for the login gap: (1) `src/auth.ts`
-  `authorize()`'s catch block — add `isDbConnectionError(error)` check
-  (reusing the existing `src/lib/apiError.ts` helper) → throw a new
-  `DbUnavailableSignInError` (code `db-unavailable`); anything still
-  unclassified → new `UnexpectedSignInError` (code `unexpected-error`)
-  instead of the previous bare `throw error` that NextAuth was
-  swallowing. (2) `src/app/login/page.tsx` — handle both new codes with
-  clear, distinct messages. (3) Same root issue exists in the
-  `session()` callback (runs on EVERY `auth()` call on EVERY protected
-  page, not just login) — make it resilient: catch DB errors there too,
-  set a new `session.user.dbUnavailable` flag instead of crashing, and
-  show a visible red banner in `Nav` (rendered on every page) when that
-  flag is true. (4) tsc-only validation (per the new lighter dev-time
-  workflow — no full build/test/validator for this step).
-- **Status**: done. All 4 steps implemented:
-  `DbUnavailableSignInError`/`UnexpectedSignInError` added to
-  `src/auth.ts`, both `authorize()` and `session()` now classify DB
-  errors via `isDbConnectionError` instead of leaking to NextAuth's
-  generic handling. `src/types/next-auth.d.ts` gained
-  `dbUnavailable?: boolean` on `Session.user`. `src/app/login/page.tsx`
-  shows a specific message for `db-unavailable`/`unexpected-error`.
-  `src/components/nav.tsx` shows a persistent red banner on every
-  authenticated page when `session.user.dbUnavailable` is true.
-  `npx tsc --noEmit` clean (no full build/test run per the new
-  lighter-validation workflow — reserved for right before a push).
-- **Next**: tell the user this is fixed but not yet committed/pushed;
-  also still need to resolve the separate `CRON_SECRET` mismatch found
-  during testing (Vercel's value doesn't match local `.env` — ask user
-  to re-check/re-paste it, likely trailing whitespace from copy-paste).
+- **Plan**: User will be busy soon; asked me to run the full
+  before-push validation (per the "full validation tier" in CLAUDE.md:
+  `npx tsc --noEmit` + `npm run lint` + `npm run build` + full `npm
+  test`) in the background so they can keep doing simple Q&A with me in
+  the meantime, then report the result when done. User then gave a
+  one-time exception to the standing manual-push rule: push myself
+  JUST this once after validation passes (not a standing change — still
+  ask every future time).
+- **Status**: done. Background sweep completed clean: `npx tsc
+  --noEmit` clean, `npm run lint` clean (same 2 pre-existing unrelated
+  warnings only), `npm test` → 204/204 passing, `npm run build`
+  succeeds with the correct 15-route list. Pushed `bb4fc45` (and this
+  log update) to `origin/main` on `parutworkmail/Project-Tracker`, per
+  the one-time exception.
+- **Next**: none — task complete. Tell user the push succeeded;
+  remaining known open item is still the Supabase pooler connection
+  string for Vercel (waiting on the pooler hostname from Supabase →
+  Settings → Database → Connection pooling).
 
-## Session: Validation-tiers workflow change
+## Session: DB connection error visibility (login + session) + Vercel DB connectivity diagnosis
+Continuing from the prior session's gap: login attempts on the live
+site were redirecting to NextAuth's own generic
+`/api/auth/error?error=Configuration` page instead of showing anything
+useful, because `authorize()`'s catch block only recognized
+`AccountLockedError`/`RateLimitedError` and rethrew everything else
+raw — which NextAuth itself swallowed before it ever reached my 503
+JSON logic.
+
+### Fix
+`src/auth.ts`: `authorize()` now classifies unexpected errors via the
+existing `isDbConnectionError()` helper from `src/lib/apiError.ts` →
+throws `DbUnavailableSignInError` (code `db-unavailable`) for DB
+failures, `UnexpectedSignInError` (code `unexpected-error`) for
+anything else — no more bare `throw error` leaking to NextAuth's
+generic handling. `src/app/login/page.tsx` shows a distinct message
+for each. The `session()` callback (runs on EVERY `auth()` call, every
+protected page) had the same gap — now catches DB errors there too,
+sets a new `session.user.dbUnavailable` flag instead of crashing into
+the generic `error.tsx` boundary. `src/types/next-auth.d.ts` gained
+`dbUnavailable?: boolean`. `src/components/nav.tsx` shows a persistent
+red banner across the whole app when that flag is true.
+`npx tsc --noEmit` clean (tsc-only per the lighter dev-time workflow).
+Committed locally as `bb4fc45`, not pushed yet at the time.
+
+### Live diagnosis: real DB connectivity root cause found
+User checked Vercel's runtime logs directly and found the real error:
+`Can't reach database server at db.deptadgzteiiiprquqah.supabase.co`.
+Root cause confirmed via research: Supabase's direct-connection host
+resolves to **IPv6 only**; Vercel serverless functions cannot make
+outbound raw TCP/Postgres connections over IPv6 at all. This is the
+exact mirror image of the already-documented local-dev problem (local
+network blocks the IPv4-only pooler, so direct-connection was chosen
+for local `.env` — but that same direct host is the one that's
+unreachable from Vercel). Supabase's own docs explicitly recommend the
+Transaction Pooler (Supavisor, `aws-0-REGION.pooler.supabase.com:6543`,
+IPv4-only) for serverless/edge deployments for exactly this reason.
+
+**Not yet fixed** — waiting on the user to check Supabase → Settings →
+Database → Connection pooling for the exact pooler hostname/region, so
+I can build the correct `DATABASE_URL`/`DIRECT_URL` for Vercel
+specifically (local `.env` stays on the direct host, unchanged, since
+that's correct for local dev's own IPv6 access + IPv4-pooler block).
+
+### Separate, still-open item
+`CRON_SECRET` mismatch between local `.env` and Vercel was resolved at
+some point during this back-and-forth (confirmed via a follow-up test:
+`/api/cron/keep-alive` went from 401 → 500, meaning the secret now
+matches and the request reached the DB query, which is what surfaced
+the real connectivity error above).
+
+### Not yet done
+- `bb4fc45` not pushed yet (standing manual-push rule — user pushes).
+- Pooler connection string fix not yet applied (waiting on pooler
+  hostname from user).
+- Full pre-push validation (this task) running now, see Live Task Log
+  above for status.
+
 User flagged that I ran the full tsc/lint/build/test/agent-validator
 sweep after every small development step, which was slow and wasteful.
 Updated `CLAUDE.md` with a new "Validation tiers" rule: tsc-only (or
