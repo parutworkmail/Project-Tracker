@@ -6,24 +6,38 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
-- **Plan**: User will be busy soon; asked me to run the full
-  before-push validation (per the "full validation tier" in CLAUDE.md:
-  `npx tsc --noEmit` + `npm run lint` + `npm run build` + full `npm
-  test`) in the background so they can keep doing simple Q&A with me in
-  the meantime, then report the result when done. User then gave a
-  one-time exception to the standing manual-push rule: push myself
-  JUST this once after validation passes (not a standing change — still
-  ask every future time).
-- **Status**: done. Background sweep completed clean: `npx tsc
-  --noEmit` clean, `npm run lint` clean (same 2 pre-existing unrelated
-  warnings only), `npm test` → 204/204 passing, `npm run build`
-  succeeds with the correct 15-route list. Pushed `bb4fc45` (and this
-  log update) to `origin/main` on `parutworkmail/Project-Tracker`, per
-  the one-time exception.
-- **Next**: none — task complete. Tell user the push succeeded;
-  remaining known open item is still the Supabase pooler connection
-  string for Vercel (waiting on the pooler hostname from Supabase →
-  Settings → Database → Connection pooling).
+- **Plan**: User pulled a real Vercel runtime log into the repo
+  (`log-vercel` file, committed as `b9b5818`) showing the actual login
+  error: `PrismaClientKnownRequestError` code `P2010`
+  ("Raw query failed...Can't reach database server"), nested
+  `DriverAdapterError: DatabaseNotReachable`. Confirms the same known
+  IPv6-connectivity root cause from before — but ALSO exposed a real
+  bug in my own classifier: `isDbConnectionError()` didn't recognize
+  `P2010`/`DatabaseNotReachable` at all, so this surfaced as the
+  generic "unexpected error" message instead of the correct "cannot
+  reach database" one. Fix: (1) add an explicit `P2010` check via
+  `error instanceof Prisma.PrismaClientKnownRequestError`, (2) add a
+  recursive `hasNestedDatabaseNotReachableCause()` walk over
+  `.meta.driverAdapterError`/`.cause` chains (since the actual
+  `DatabaseNotReachable` string is buried there, not on a top-level
+  `.code`), (3) add tests built directly from this real log's shape
+  (not guessed), (4) remove the committed `log-vercel` file from the
+  repo (it's an ad-hoc paste, not meant to be permanent, and contains
+  the real DB hostname) — tell user it's removed, they can keep a local
+  copy outside git if wanted. (5) tsc + targeted test file only (light
+  dev-time validation, not full sweep — that's reserved for next push).
+- **Status**: done. All 5 steps applied.
+  `npx tsc --noEmit` clean, `npx vitest run src/lib/apiError.test.ts` →
+  22/22 passing (4 new, built directly from the real P2010/
+  DatabaseNotReachable log shape). `git rm log-vercel` staged.
+- **Next**: commit locally (not pushing — back to the standard
+  ask-first rule, the prior push was a stated one-time exception).
+  Still waiting on the user for the actual root-cause fix: the
+  Supabase pooler hostname (Settings → Database → Connection pooling)
+  to replace the IPv6-only direct host in Vercel's `DATABASE_URL`/
+  `DIRECT_URL`. This classifier fix only makes the SAME underlying
+  connectivity failure show the correct message — it does not fix the
+  connectivity itself.
 
 ## Session: DB connection error visibility (login + session) + Vercel DB connectivity diagnosis
 Continuing from the prior session's gap: login attempts on the live

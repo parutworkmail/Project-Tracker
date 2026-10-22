@@ -31,6 +31,40 @@ describe("isDbConnectionError", () => {
     expect(isDbConnectionError(error)).toBe(true);
   });
 
+  it("returns true for PrismaClientKnownRequestError with code P2010 (raw query failed to reach the server)", () => {
+    const error = new Prisma.PrismaClientKnownRequestError(
+      "Raw query failed. Code: `N/A`. Message: `Can't reach database server`",
+      { code: "P2010", clientVersion: "test" }
+    );
+    expect(isDbConnectionError(error)).toBe(true);
+  });
+
+  it("returns false for PrismaClientKnownRequestError with an unrelated code", () => {
+    const error = new Prisma.PrismaClientKnownRequestError(
+      "Unique constraint failed",
+      { code: "P2002", clientVersion: "test" }
+    );
+    expect(isDbConnectionError(error)).toBe(false);
+  });
+
+  it("returns true when a nested driverAdapterError.message contains DatabaseNotReachable (matches a real production log)", () => {
+    const driverAdapterError = new Error(
+      "DriverAdapterError: DatabaseNotReachable"
+    );
+    const error = new Prisma.PrismaClientKnownRequestError("Raw query failed", {
+      code: "P2010",
+      clientVersion: "test",
+      meta: { driverAdapterError },
+    });
+    expect(isDbConnectionError(error)).toBe(true);
+  });
+
+  it("returns true when DatabaseNotReachable is nested under .cause instead of .meta", () => {
+    const cause = new Error("DatabaseNotReachable");
+    const error = Object.assign(new Error("wrapper"), { cause });
+    expect(isDbConnectionError(error)).toBe(true);
+  });
+
   it.each(["ECONNREFUSED", "ENOTFOUND", "ETIMEDOUT", "EHOSTUNREACH", "ENETUNREACH"])(
     "returns true for a raw error with code %s",
     (code) => {

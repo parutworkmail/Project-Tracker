@@ -40,11 +40,62 @@ export function isDbConnectionError(error: unknown): boolean {
     return true;
   }
 
+  // P2010: "Raw query failed" - the driver adapter (pg) couldn't even
+  // reach the server (as opposed to the query itself being invalid).
+  // Confirmed from a real production log: the underlying
+  // DriverAdapterError.message was literally "DatabaseNotReachable",
+  // nested under error.meta.driverAdapterError, not a top-level code.
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2010"
+  ) {
+    return true;
+  }
+
   if (typeof error === "object" && error !== null && "code" in error) {
     const code = (error as { code?: unknown }).code;
     if (typeof code === "string" && CONNECTION_ERROR_CODES.has(code)) {
       return true;
     }
+  }
+
+  if (hasNestedDatabaseNotReachableCause(error)) {
+    return true;
+  }
+
+  return false;
+}
+
+// Walks a possibly-nested `meta.driverAdapterError`/`cause` chain looking
+// for the driver adapter's own "can't reach the database" signal, which
+// doesn't surface as a top-level error code or class.
+function hasNestedDatabaseNotReachableCause(
+  error: unknown,
+  depth = 0
+): boolean {
+  if (depth > 5 || typeof error !== "object" || error === null) {
+    return false;
+  }
+
+  const err = error as {
+    message?: unknown;
+    meta?: { driverAdapterError?: unknown };
+    cause?: unknown;
+  };
+
+  if (
+    typeof err.message === "string" &&
+    err.message.includes("DatabaseNotReachable")
+  ) {
+    return true;
+  }
+
+  if (hasNestedDatabaseNotReachableCause(err.meta?.driverAdapterError, depth + 1)) {
+    return true;
+  }
+
+  if (hasNestedDatabaseNotReachableCause(err.cause, depth + 1)) {
+    return true;
   }
 
   return false;
