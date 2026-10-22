@@ -1,0 +1,21 @@
+%%{init: {'theme': 'neutral'}}%%
+flowchart TD
+    AD["👤 Admin"]
+
+    subgraph SYS["Project Tracker System"]
+        direction TB
+        UC1(("Rename / delete<br/>ONLY projects<br/>they're assigned to"))
+        UC2(("Access an assigned<br/>project without joining"))
+        UC3(("Join a project<br/>via link"))
+        UC4(("Create / view issues<br/>(if a member or assigned)"))
+        UC5(("Update issue status<br/>(if a member or assigned)"))
+        UC6(("Log in"))
+        UC7(("Change own password"))
+    end
+
+    AD --> UC1 & UC2 & UC3 & UC4 & UC5 & UC6 & UC7
+
+    Note["⚠️ On any project NOT assigned<br/>to them, an Admin has exactly<br/>the same access as a plain User."]
+    style Note fill:#fef3c7,stroke:#92400e,stroke-dasharray: 4 2
+
+    style AD fill:#bfdbfe,stroke:#1e3a8a

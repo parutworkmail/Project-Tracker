@@ -1,0 +1,42 @@
+%%{init: {'theme': 'neutral'}}%%
+sequenceDiagram
+    actor User
+    participant App as Login Page
+    participant Auth as Auth Logic
+    participant DB as Database
+
+    User->>App: Enter username + password
+    App->>Auth: Submit credentials
+    Auth->>Auth: Check IP rate limit<br/>(max 10 / 15 min)
+    alt Rate limit exceeded
+        Auth-->>App: "Too many attempts"
+        App-->>User: Show rate-limit message
+    else Within limit
+        Auth->>DB: Look up user by username
+        alt Database unreachable
+            DB-->>Auth: Connection error
+            Auth-->>App: "Database unavailable"
+            App-->>User: Show DB-unavailable message
+        else Database OK
+            DB-->>Auth: User record (or none)
+            alt Account currently locked
+                Auth-->>App: "Account locked, try again later"
+                App-->>User: Show lockout message
+            else Not locked
+                Auth->>Auth: Compare password hash
+                alt Wrong password
+                    Auth->>DB: Increment failed-attempt count
+                    Auth-->>App: "Invalid username or password"
+                    App-->>User: Show generic error<br/>(5th failure triggers lockout)
+                else Correct password
+                    Auth->>DB: Clear failed-attempt count
+                    Auth-->>App: Session created
+                    alt mustChangePassword = true
+                        App-->>User: Redirect to /change-password
+                    else
+                        App-->>User: Redirect to /dashboard
+                    end
+                end
+            end
+        end
+    end

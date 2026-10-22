@@ -1,0 +1,22 @@
+%%{init: {'theme': 'neutral'}}%%
+flowchart TD
+    SA["👤 Super Admin"]
+
+    subgraph SYS["Project Tracker System"]
+        direction TB
+        UC1(("Create a project"))
+        UC2(("Rename / delete<br/>any project"))
+        UC3(("Create / delete<br/>user accounts"))
+        UC4(("Change any user's<br/>global role"))
+        UC5(("Assign / unassign<br/>project admins"))
+        UC6(("Access any project<br/>without joining"))
+        UC7(("Join a project<br/>via link"))
+        UC8(("Create / view issues"))
+        UC9(("Update issue status"))
+        UC10(("Log in"))
+        UC11(("Change own password"))
+    end
+
+    SA --> UC1 & UC2 & UC3 & UC4 & UC5 & UC6 & UC7 & UC8 & UC9 & UC10 & UC11
+
+    style SA fill:#fde68a,stroke:#92400e

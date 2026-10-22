@@ -6,21 +6,64 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
-- **Plan**: User is done for today, no new features. Asked me to run
-  full validation (tsc + lint + build + full test suite — the "before a
-  push" tier from CLAUDE.md), log progress, and push. 3 unpushed local
-  commits exist (`b5dd099` P2010 classifier fix, `f0f2add` log entry,
-  `43d5443` log entry) on top of the already-pushed `b9b5818`.
-- **Status**: done. Full sweep clean: `npx tsc --noEmit` clean, `npm
-  run lint` clean (same 2 pre-existing unrelated warnings only), `npm
-  test` → **208/208 passing**, `npm run build` succeeds with the
-  correct 15-route list. Pushed `b5dd099`/`f0f2add`/`43d5443` (+ this
-  log entry) to `origin/main` on `parutworkmail/Project-Tracker`, per
-  explicit user request this time.
-- **Next**: none — task complete. User is done for the day, no new
-  feature work pending. Known future item (not urgent, user's own
-  words): wants to revisit/improve the UI later — no action needed
-  until asked.
+- **Plan**: User wants documentation generated: (1) a business/logic
+  document describing what features currently exist, what they can and
+  can't do (capabilities + known limitations), and (2) use case diagram
+  images showing actors (SUPER_ADMIN/ADMIN/USER) and their interactions.
+  Plan: (a) do a thorough re-read of the actual current codebase (not
+  just PROGRESS.md summaries, which could be stale/incomplete) to build
+  an accurate feature inventory — permissions matrix, all routes/pages,
+  what's explicitly NOT implemented (email verification, project
+  transfer, bulk operations, etc.), (b) write `docs/FEATURES.md` with
+  that inventory in a business-readable format, (c) write use case
+  diagrams as Mermaid syntax (renders natively on GitHub and most
+  markdown viewers) AND attempt to render them to actual standalone
+  image files via `@mermaid-js/mermaid-cli` (`npx mmdc`) if it installs
+  cleanly — fall back to Mermaid-in-markdown only if the CLI render
+  fails, (d) save actual image files under `docs/diagrams/` if
+  rendering succeeds, (e) light validation only (this is docs, not
+  app code — no tsc/build/test needed, just make sure markdown/mermaid
+  syntax is valid and nothing in src/ was touched), (f) commit locally
+  only, not pushing unless asked.
+- **Status**: codebase audit done via a read-only sub-agent — complete,
+  accurate feature inventory gathered (auth, roles/permissions matrix,
+  project management, admin console, issue tracking, security, error
+  handling, full route list, and an extensive "explicitly NOT
+  implemented" gap list). Confirmed `npx -y @mermaid-js/mermaid-cli
+  --version` works (12.0.0) — can render actual PNG diagram files, not
+  just Mermaid-in-markdown.
+- **Next**: write `docs/FEATURES.md` (business-readable capabilities +
+  limitations doc), write 2-3 Mermaid `.mmd` source files (use case
+  diagram with SUPER_ADMIN/ADMIN/USER actors, maybe a project-lifecycle
+  flow diagram), render each to a PNG under `docs/diagrams/` via mmdc,
+  embed/reference them from `docs/FEATURES.md`, then commit locally.
+- **Status**: done. `docs/FEATURES.md` written (roles/permission matrix,
+  account & login, projects, issue tracking, admin console, reliability,
+  and a "known limitations" summary — all grounded in the actual code,
+  not assumptions). 5 Mermaid diagrams under `docs/diagrams/`:
+  `usecase-superadmin`, `usecase-admin`, `usecase-user` (split into 3
+  per-role diagrams instead of 1 combined one — a single
+  all-actors-vs-all-use-cases flowchart rendered as an unreadable tangle
+  of crossing edges; three small ones read cleanly), `flow-project-
+  lifecycle` (creation → join/assign → issues → deletion), and
+  `sequence-login` (every branch: rate limit, DB-unavailable, lockout,
+  wrong password, forced password change). All 5 rendered to actual PNG
+  files via `npx -y @mermaid-js/mermaid-cli` (needed a
+  `puppeteer-config.json` with `--no-sandbox` to avoid a `Network.enable
+  timed out` error in this environment — documented in
+  `docs/diagrams/README.md` for future regeneration). Verified `git
+  status` shows only `PROGRESS.md` + new `docs/` — nothing in `src/`
+  touched, consistent with this being a docs-only task.
+- **Next**: commit locally (not pushing — standard ask-first rule).
+
+## Session: Final validation + push (login fix confirmed working)
+User confirmed the login/DB-connectivity fix works on the live site and
+had no more feature work for the day. Ran the full pre-push validation
+tier: `npx tsc --noEmit` clean, `npm run lint` clean (same 2
+pre-existing unrelated warnings only), `npm test` → 208/208 passing,
+`npm run build` succeeds with the correct 15-route list. Pushed
+`b5dd099`/`f0f2add`/`43d5443` (+ log entries) to `origin/main` on
+`parutworkmail/Project-Tracker`, per explicit user request.
 
 ## Session: Vercel DB connectivity fix (Supabase pooler)
 Root cause: Supabase's direct-connection hostname

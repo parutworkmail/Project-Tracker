@@ -1,0 +1,16 @@
+%%{init: {'theme': 'neutral'}}%%
+flowchart TD
+    US["👤 User"]
+
+    subgraph SYS["Project Tracker System"]
+        direction TB
+        UC1(("Join a project<br/>via link"))
+        UC2(("Create / view issues<br/>(in projects they joined)"))
+        UC3(("Update issue status<br/>(in projects they joined)"))
+        UC4(("Log in"))
+        UC5(("Change own password"))
+    end
+
+    US --> UC1 & UC2 & UC3 & UC4 & UC5
+
+    style US fill:#bbf7d0,stroke:#14532d
