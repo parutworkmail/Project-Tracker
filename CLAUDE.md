@@ -17,6 +17,34 @@ past "yes, push" does not carry forward to later tasks or sessions.
 Commit locally as normal; just stop before the push and tell the user
 their local `main` is ready to push.
 
+## Validation tiers: light while developing, full only before a push (standing rule)
+Full tsc + lint + build + full test suite + an agent validator pass on
+every small step is too slow and wasteful — this was flagged as a real
+workflow problem. Use two tiers instead:
+
+1. **While developing/iterating on a feature** (the normal case): after
+   each file change, only run a FAST, TARGETED syntax/type check —
+   `npx tsc --noEmit` is fine (it's quick), but do NOT run `npm run
+   build`, do NOT run the full `npm test` suite, and do NOT spin up an
+   `agent` validator sub-agent after every step. If you want quick
+   confidence on the specific thing you just touched, run only the
+   relevant test file(s) (e.g. `npx vitest run path/to/thing.test.ts`),
+   not the whole suite.
+2. **Full validation pass** — `npx tsc --noEmit` + `npm run lint` +
+   `npm run build` + full `npm test` + (optional) one `agent` validator
+   pass — is reserved for:
+   - right before the user is about to `git push` (i.e. when wrapping
+     up a feature and handing it off), or
+   - whenever the user explicitly asks for "full validation"/"make sure
+     everything works"/equivalent.
+   Do not self-trigger a full sweep just because a step "feels done" —
+   wait for one of the two triggers above, or ask if genuinely unsure
+   which tier applies.
+
+This supersedes the per-phase "runs tsc/lint/build itself" language in
+the Team Workflow below and rule 4 under Rules — those describe the
+FULL-validation tier, not something to repeat after every small edit.
+
 ## RULE ZERO — LOG BEFORE YOU TOUCH ANYTHING (no exceptions, read this first, every message)
 This has been violated before by treating it as optional for "small" or
 "obviously what the user asked for" actions. It is NOT optional and there

@@ -6,12 +6,17 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
-- **Plan**: (none in progress)
-- **Status**: idle.
-- **Next**: none — awaiting next user request. Last completed work:
-  graceful DB-unavailable error handling for all API routes, committed
-  locally (not pushed, per standing manual-push rule) — see "Session:
-  Graceful DB-connection error handling" below for full details.
+- **Plan**: User flagged that I've been running the full
+  tsc/lint/build/test/agent-validator sweep after every small
+  development step, which is slow and wasteful. Wants a lighter
+  validation loop while developing — only full-validate right before a
+  push. Updated `CLAUDE.md` with a new "Validation tiers" rule: tsc-only
+  (or targeted single-test-file runs) while iterating; full
+  tsc+lint+build+full-test+(optional validator) only right before a
+  push or when explicitly asked.
+- **Status**: done.
+- **Next**: none — task complete. Applying lighter validation from now
+  on for in-progress feature work.
 
 ## Session: Graceful DB-connection error handling
 User asked why the deploy "just shows the site" with no error when the
