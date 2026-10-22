@@ -10,6 +10,13 @@
   (origin remote, forked from the original to the user's personal
   account — see PROGRESS.md "Session: repo ownership transfer").
 
+## Git push: manual only, by the user (standing rule)
+User pushes to `origin` themselves from now on. Do NOT run `git push`
+unless the user explicitly asks for it in that specific message — a
+past "yes, push" does not carry forward to later tasks or sessions.
+Commit locally as normal; just stop before the push and tell the user
+their local `main` is ready to push.
+
 ## RULE ZERO — LOG BEFORE YOU TOUCH ANYTHING (no exceptions, read this first, every message)
 This has been violated before by treating it as optional for "small" or
 "obviously what the user asked for" actions. It is NOT optional and there

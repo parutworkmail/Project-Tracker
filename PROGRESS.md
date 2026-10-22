@@ -6,87 +6,68 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
-- **Plan**: User forked the repo to their personal GitHub account; new
-  remote is `https://github.com/parutworkmail/Project-Tracker.git`
-  (replaces old `https://github.com/bardtestbard5-maker/Project-Tracker.git`).
-  Wants the git remote updated and any hardcoded references to the old
-  repo path fixed across the project. Plan: (1) update `git remote set-url
-  origin` to the new URL, (2) grep the whole repo (not just src/) for the
-  old owner name `bardtestbard5-maker` and the old repo URL to find any
-  hardcoded references (README, package.json repository field,
-  vercel.json, CI config, project.md, CLAUDE.md, PROGRESS.md itself),
-  (3) fix each one found, (4) verify `git remote -v` and that `git fetch`
-  works against the new remote, (5) report back what the user still
-  needs to do themselves (Vercel project reconnect/re-import if deployed,
-  any GitHub Actions secrets, collaborator access, etc. — these require
-  the user's own GitHub/Vercel dashboard access, not something I can do
-  from here).
-- **Status**: done. `git remote set-url origin
-  https://github.com/parutworkmail/Project-Tracker.git` applied, verified
-  via `git remote -v` and `.git/config`. Grepped the whole repo (not
-  just `src/`) for the old owner name and old repo URL — zero hardcoded
-  references found anywhere in actual code/config (package.json has no
-  `repository`/`homepage`/`bugs` fields, `vercel.json` has none either).
-  Confirmed connectivity with `git fetch origin -v` — succeeded, and
-  `origin/main` is already at the same commit as local HEAD (`96f4a0a`),
-  so the fork is fully in sync already, no push needed.
-- **Next**: none — task complete. Reported to user what still needs
-  their own action (Vercel reconnect/env vars, GitHub access/secrets) —
-  see reply.
+- **Plan**: (none in progress)
+- **Status**: idle.
+- **Next**: none — awaiting next user request. Last completed work: repo
+  ownership transfer + Vercel build fix + standing no-auto-push rule —
+  see "Session: Repo ownership transfer, Vercel build fix, deploy
+  validation" below for full details.
 
-- **Plan**: User's Vercel deploy fails: "Module not found: Can't resolve
-  '@/generated/prisma/client'" then build exits 1. Root cause found:
-  `.gitignore` has `/src/generated/prisma` — the Prisma-generated client
-  is NEVER committed to git. It only "works" locally because I've been
-  manually running `npx prisma generate` throughout every session this
-  whole project, leaving the generated files on disk outside git's view.
-  Vercel does a fresh clone + `npm install` + `npm run build` with none
-  of that — no generated client exists, `next build` fails on the first
-  import of it. Fix: add a `"postinstall": "prisma generate"` script to
-  `package.json` (the standard Next.js+Prisma+Vercel pattern — Vercel
-  runs `npm install` which triggers `postinstall` automatically before
-  `npm run build`). Will verify locally by deleting
-  `src/generated/prisma`, running `npm install` fresh, confirming it
-  regenerates, then running the full tsc/lint/build/test sweep before
-  pushing.
-- **Status**: done. Added `"postinstall": "prisma generate"` to
-  `package.json`. Verified the fix actually works (not just "looks
-  right"): deleted `src/generated/prisma` entirely to simulate a fresh
-  Vercel clone, ran `npm install` — confirmed `postinstall` fired and
-  regenerated the client correctly. Then ran full sweep:
-  `npx tsc --noEmit` clean, `npm test` → 186/186 passing, `npm run lint`
-  clean (same pre-existing unrelated warnings), `npm run build`
-  succeeds with the full expected route list. `package-lock.json` picked
-  up the new postinstall hook (1-line diff, no dependency changes).
-- **Next**: none — pushed. Commit `177d5d0` on `main`, pushed to
-  `parutworkmail/Project-Tracker`. Vercel should auto-redeploy on push
-  (if its GitHub integration triggers on push) — otherwise user needs to
-  trigger a redeploy manually from the Vercel dashboard.
+## Session: Repo ownership transfer, Vercel build fix, deploy validation
 
-- **Plan**: User wants me to (1) remember the deployed site URL
-  (`project-tracker-virid-eight.vercel.app`) so that any future "open
-  the site" request opens this exact URL — noting I have no browser-
-  automation tool, so "open on my Chrome" isn't literally possible from
-  here; I'll say that plainly and use the `fetch`/`agentic_fetch` tools
-  to actually hit the URL instead. (2) Run some verification/validation
-  against the live deployed site now, not just local build checks —
-  i.e. confirm the postinstall fix actually fixed the real Vercel deploy
-  (not just locally), and spot-check that key pages respond correctly
-  (homepage, /login, and ideally an API route) without server errors.
-  Saving the URL to PROGRESS.md (persists across sessions) and to
-  CLAUDE.md as a quick-reference fact.
-- **Status**: done. Saved the URL to `CLAUDE.md` under a new "Quick
-  facts" section (checked every session) so future "open the site"
-  requests reference it without re-asking. Validated the live deploy
-  via `fetch` (no browser-automation tool available, so used HTTP
-  checks instead of literally opening Chrome — told the user this
-  limitation plainly): homepage and `/login` render cleanly with no
-  error overlays; `/api/admin/users` with no session correctly returns
-  `401` (not a 500 — confirms the postinstall fix actually resolved the
-  Prisma-client-not-found build error on the real Vercel deploy, and the
-  DB connection works in production); `/dashboard` with no session
-  correctly 307-redirects to `/login`. No crashes, no 500s found.
-- **Next**: none — task complete.
+### Repo ownership transfer
+User forked the repo to their personal GitHub account:
+`https://github.com/parutworkmail/Project-Tracker.git` (replaces old
+`https://github.com/bardtestbard5-maker/Project-Tracker.git`). Updated
+`git remote set-url origin` to the new URL. Grepped the whole repo (not
+just `src/`) for the old owner name and old repo URL — zero hardcoded
+references found anywhere in actual code/config. Confirmed connectivity
+with `git fetch origin -v` — succeeded, fork was already in sync with
+local HEAD, no push needed at that point.
+
+### Vercel build fix: missing Prisma client on fresh install
+User's Vercel deploy failed: "Module not found: Can't resolve
+'@/generated/prisma/client'" then `npm run build` exiting 1. Root
+cause: `.gitignore` has `/src/generated/prisma` (correct — it's
+generated code) but nothing regenerated it before `next build` on a
+fresh clone/install. It only worked locally because `npx prisma
+generate` had been run manually throughout every prior session,
+leaving the files on disk outside git's view. Fix: added
+`"postinstall": "prisma generate"` to `package.json` (standard
+Next.js+Prisma+Vercel pattern — Vercel always runs `npm install`
+before building, which triggers `postinstall` automatically).
+
+Verified the fix actually works, not just "looks right": deleted
+`src/generated/prisma` entirely to simulate a fresh Vercel clone, ran
+`npm install`, confirmed `postinstall` fired and regenerated the
+client correctly. Then full sweep: `npx tsc --noEmit` clean, `npm
+test` → 186/186 passing, `npm run lint` clean, `npm run build`
+succeeds with the full expected route list. Committed and pushed
+(`177d5d0`) to `parutworkmail/Project-Tracker` — user explicitly asked
+to push that time.
+
+### Deployed site URL + live validation
+Saved the live site URL
+(`https://project-tracker-virid-eight.vercel.app`) to `CLAUDE.md`
+under a "Quick facts" section so future "open the site" requests
+reference it without re-asking — noted plainly that this agent has no
+browser-automation tool, so it uses `fetch`/`agentic_fetch` to check
+the site via HTTP instead of literally opening Chrome.
+
+Validated the live deploy: homepage and `/login` render cleanly with
+no error overlays; `/api/admin/users` with no session correctly
+returns `401` (not a 500 — confirms the postinstall fix actually
+resolved the build error on the real Vercel deploy, and the DB
+connection works in production); `/dashboard` with no session
+correctly 307-redirects to `/login`. No crashes, no 500s found.
+Committed and pushed (`9c215a6`).
+
+### Standing rule change
+User said they will handle `git push` manually themselves from now on
+— even after explicitly asking me to push earlier in this same
+session. Added an explicit rule to `CLAUDE.md`: never push unless the
+user asks in that specific message; a prior "yes push" does not carry
+forward to future tasks.
 
 ## Session: Delete-user admin feature
 User tested the admin console and found no way to delete a user — only
