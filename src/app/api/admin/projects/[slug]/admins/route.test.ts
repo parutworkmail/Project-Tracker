@@ -16,6 +16,7 @@ vi.mock("@/lib/prisma", () => ({
     user: { findUnique: userFindUnique },
     projectAdmin: { upsert: projectAdminUpsert },
   },
+  DbUnavailableError: class DbUnavailableError extends Error {},
 }));
 
 import { POST } from "./route";

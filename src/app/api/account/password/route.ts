@@ -4,8 +4,9 @@ import bcrypt from "bcryptjs";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { changePasswordSchema } from "@/lib/validation/auth";
+import { withApiErrorHandling } from "@/lib/apiError";
 
-export async function PATCH(request: Request) {
+async function handlePATCH(request: Request) {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -48,3 +49,5 @@ export async function PATCH(request: Request) {
 
   return NextResponse.json({ ok: true });
 }
+
+export const PATCH = withApiErrorHandling(handlePATCH);

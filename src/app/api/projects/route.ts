@@ -7,11 +7,12 @@ import { generateSchemaName, provisionProjectSchema } from "@/lib/projectSchema"
 import { createProjectSchema } from "@/lib/validation/project";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { canCreateProject } from "@/lib/permissions";
+import { withApiErrorHandling } from "@/lib/apiError";
 
 const CREATE_PROJECT_LIMIT = 10;
 const CREATE_PROJECT_WINDOW_MS = 60 * 60 * 1000;
 
-export async function GET() {
+async function handleGET() {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -33,7 +34,7 @@ export async function GET() {
   );
 }
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -98,3 +99,6 @@ export async function POST(request: Request) {
     { status: 201 }
   );
 }
+
+export const GET = withApiErrorHandling(handleGET);
+export const POST = withApiErrorHandling(handlePOST);

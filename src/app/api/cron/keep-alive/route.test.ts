@@ -6,6 +6,7 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     $queryRaw: queryRaw,
   },
+  DbUnavailableError: class DbUnavailableError extends Error {},
 }));
 
 import { GET } from "./route";

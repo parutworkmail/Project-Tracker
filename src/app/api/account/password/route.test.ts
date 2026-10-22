@@ -11,6 +11,7 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: { update: userUpdate },
   },
+  DbUnavailableError: class DbUnavailableError extends Error {},
 }));
 
 import { PATCH } from "./route";

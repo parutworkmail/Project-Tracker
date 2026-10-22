@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { createIssue, listIssues } from "@/lib/projectSchema";
 import { createIssueSchema } from "@/lib/validation/project";
 import { canAccessProject } from "@/lib/permissions";
+import { withApiErrorHandling } from "@/lib/apiError";
 
 async function getMembership(slug: string, userId: string) {
   const project = await prisma.project.findUnique({
@@ -20,7 +21,7 @@ async function getMembership(slug: string, userId: string) {
   return { project, membership };
 }
 
-export async function GET(
+async function handleGET(
   _request: Request,
   { params }: { params: Promise<{ slug: string }> }
 ) {
@@ -52,7 +53,7 @@ export async function GET(
   return NextResponse.json(issues);
 }
 
-export async function POST(
+async function handlePOST(
   request: Request,
   { params }: { params: Promise<{ slug: string }> }
 ) {
@@ -98,3 +99,6 @@ export async function POST(
 
   return NextResponse.json(issue, { status: 201 });
 }
+
+export const GET = withApiErrorHandling(handleGET);
+export const POST = withApiErrorHandling(handlePOST);

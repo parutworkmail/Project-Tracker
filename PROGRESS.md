@@ -8,10 +8,99 @@ Logging". Shows exactly what was happening if the last session crashed.)
 
 - **Plan**: (none in progress)
 - **Status**: idle.
-- **Next**: none — awaiting next user request. Last completed work: repo
-  ownership transfer + Vercel build fix + standing no-auto-push rule —
-  see "Session: Repo ownership transfer, Vercel build fix, deploy
-  validation" below for full details.
+- **Next**: none — awaiting next user request. Last completed work:
+  graceful DB-unavailable error handling for all API routes, committed
+  locally (not pushed, per standing manual-push rule) — see "Session:
+  Graceful DB-connection error handling" below for full details.
+
+## Session: Graceful DB-connection error handling
+User asked why the deploy "just shows the site" with no error when the
+database isn't configured in Vercel, and pointed out that a proper
+HTTP status/message should be returned instead. Confirmed via a direct
+fetch to the live `/api/cron/keep-alive` endpoint: it returned a raw,
+unstructured `500` with no JSON body.
+
+### Root cause
+`src/lib/prisma.ts` throws a plain `Error` synchronously (inside a
+Proxy getter) if `SUPABASE_DB_HOST/USER/PASSWORD` are missing, and
+nothing in any API route caught it — so whatever generic framework-level
+error response Next.js produces for an uncaught exception is all a
+client ever sees. Pages that render on the DB (dashboard, admin, etc.)
+already fell back gracefully to the existing `src/app/error.tsx`
+boundary (confirmed, no changes needed there) — only API routes were
+raw.
+
+### Fix
+- `src/lib/prisma.ts`: the thrown error is now a named
+  `DbUnavailableError` class (was a plain `Error`), detectable by
+  `instanceof` instead of string-matching a message.
+- New `src/lib/apiError.ts`: `isDbConnectionError()` (matches
+  `DbUnavailableError` + Prisma's own
+  `PrismaClientInitializationError`/`RustPanicError`/
+  `UnknownRequestError` + common `pg` connection-refused codes) and
+  `withApiErrorHandling()`, a generic wrapper applied to every exported
+  GET/POST/PATCH/DELETE across all 12 of this app's own API routes
+  (NextAuth's own `/api/auth/[...nextauth]` handler deliberately left
+  untouched). Maps DB-connection-shaped errors to a clean `503 Service
+  Unavailable` + JSON `{error: "..."}`, anything else unexpected to a
+  generic `500` + JSON — never a raw stack trace to the client.
+
+### Two real bugs caught during implementation (not just "looks right")
+1. **Next.js internal control-flow errors were being swallowed.**
+   `npm run build` itself (not a test) surfaced this: prerendering
+   probing throws special errors tagged with a `digest` property
+   (`NEXT_PRERENDER_INTERRUPTED`, `HANGING_PROMISE_REJECTION`) to
+   signal "this route needs dynamic rendering" — confirmed via Next's
+   own `catchError` docs that `redirect()`/`notFound()`/these bailout
+   signals must never be caught by application error handling. Fixed:
+   `withApiErrorHandling` now checks for a string `.digest` property
+   FIRST and rethrows immediately, before any DB-error or generic-error
+   handling. Rebuilt afterward: noisy logs gone, same correct route
+   list.
+2. **Test mocks of `@/lib/prisma` without `DbUnavailableError`.**
+   `isDbConnectionError` does `error instanceof DbUnavailableError`;
+   a `vi.mock("@/lib/prisma", ...)` that omits that export makes the
+   import resolve to `undefined`, so `instanceof undefined` throws a
+   `TypeError` the moment any unexpected error reaches that check —
+   crashing the error handler itself. First caught by `npm test` in 2
+   files that explicitly test the "unknown error" path; an independent
+   agent validator then found the SAME bug class latent in 10 more test
+   files that mock `@/lib/prisma` but don't yet have a test exercising
+   that exact path (so it hadn't surfaced yet, but would on any future
+   test addition). Fixed all 12 by adding `DbUnavailableError: class
+   DbUnavailableError extends Error {}` to each mock factory.
+
+### Other changes
+- The 2 existing "rethrows non-P2002/P2003 errors instead of
+  swallowing them" tests asserted the OLD behavior (unknown errors
+  propagate as exceptions) — updated both to assert the NEW intended
+  behavior (caught and converted to a clean `500`).
+- New `src/lib/apiError.test.ts`: full branch coverage of
+  `isDbConnectionError` and `withApiErrorHandling`, including the
+  digest-rethrow behavior.
+
+### Verification
+`npx tsc --noEmit` clean. `npm test` → **204/204 passing** (186 carried
+over + 18 new). `npm run lint` clean (same pre-existing unrelated
+warnings only). `npm run build` succeeds with clean output (no more
+spurious "Unhandled API error" logging during prerendering), same
+correct route list as before. Independent agent validator reviewed the
+full change (wrap-order correctness, information-disclosure risk in
+both the 503 and 500 response bodies, the pg-error-code check's safety
+against non-Error throws, Retry-After header preservation on existing
+rate-limited routes, and the test-mock scan above) — found the one real
+issue (the 10-file mock gap) described above, confirmed fixed.
+
+### Not yet done
+- Committed locally only — NOT pushed, per the standing manual-push
+  rule (user pushes themselves).
+- Still outstanding from before: the live Vercel deployment needs its
+  environment variables actually configured in the Vercel dashboard
+  (`SUPABASE_DB_*`, `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`,
+  `AUTH_TRUST_HOST`, `CRON_SECRET`) — this fix makes the FAILURE mode
+  clean (503 instead of raw 500), it does not configure the DB
+  connection itself. That's still on the user to do in the Vercel
+  dashboard.
 
 ## Session: Repo ownership transfer, Vercel build fix, deploy validation
 

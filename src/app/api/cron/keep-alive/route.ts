@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
+import { withApiErrorHandling } from "@/lib/apiError";
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const authHeader = request.headers.get("authorization");
 
   if (
@@ -16,3 +17,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ ok: true, timestamp: new Date().toISOString() });
 }
+
+export const GET = withApiErrorHandling(handleGET);

@@ -12,6 +12,7 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: { findMany: userFindMany, create: userCreate },
   },
+  DbUnavailableError: class DbUnavailableError extends Error {},
 }));
 
 import { Prisma } from "@/generated/prisma/client";
@@ -34,7 +35,7 @@ describe("GET /api/admin/users", () => {
   it("returns 401 when there is no session", async () => {
     authMock.mockResolvedValue(null);
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost"));
 
     expect(response.status).toBe(401);
     expect(userFindMany).not.toHaveBeenCalled();
@@ -43,7 +44,7 @@ describe("GET /api/admin/users", () => {
   it("returns 403 for a non-super-admin (ADMIN)", async () => {
     authMock.mockResolvedValue({ user: { id: "user-1", role: "ADMIN" } });
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost"));
 
     expect(response.status).toBe(403);
     expect(userFindMany).not.toHaveBeenCalled();
@@ -52,7 +53,7 @@ describe("GET /api/admin/users", () => {
   it("returns 403 for a non-super-admin (USER)", async () => {
     authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost"));
 
     expect(response.status).toBe(403);
     expect(userFindMany).not.toHaveBeenCalled();
@@ -71,7 +72,7 @@ describe("GET /api/admin/users", () => {
       },
     ]);
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -174,13 +175,17 @@ describe("POST /api/admin/users", () => {
     expect(body.error).toContain("username");
   });
 
-  it("rethrows non-P2002 errors instead of swallowing them", async () => {
+  it("returns a clean 500 (not a raw crash) for non-P2002 errors", async () => {
     authMock.mockResolvedValue({ user: { id: "super-1", role: "SUPER_ADMIN" } });
     userCreate.mockRejectedValue(new Error("connection lost"));
 
-    await expect(
-      POST(jsonRequest({ username: "jdoe", password: "password123" }))
-    ).rejects.toThrow("connection lost");
+    const response = await POST(
+      jsonRequest({ username: "jdoe", password: "password123" })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(typeof body.error).toBe("string");
   });
 
   it("creates the user with mustChangePassword true and a bcrypt hash, returns 201", async () => {

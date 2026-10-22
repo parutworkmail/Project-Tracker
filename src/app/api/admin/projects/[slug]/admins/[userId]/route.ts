@@ -3,8 +3,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isSuperAdmin } from "@/lib/permissions";
+import { withApiErrorHandling } from "@/lib/apiError";
 
-export async function DELETE(
+async function handleDELETE(
   _request: Request,
   { params }: { params: Promise<{ slug: string; userId: string }> }
 ) {
@@ -32,3 +33,5 @@ export async function DELETE(
 
   return NextResponse.json({ ok: true });
 }
+
+export const DELETE = withApiErrorHandling(handleDELETE);

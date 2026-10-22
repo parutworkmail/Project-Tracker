@@ -16,6 +16,7 @@ vi.mock("@/lib/prisma", () => ({
     projectMember: { findMany: projectMemberFindMany },
     project: { create: projectCreate },
   },
+  DbUnavailableError: class DbUnavailableError extends Error {},
 }));
 
 vi.mock("@/lib/rateLimit", () => ({
@@ -51,7 +52,7 @@ describe("GET /api/projects", () => {
   it("returns 401 when there is no session", async () => {
     authMock.mockResolvedValue(null);
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost"));
 
     expect(response.status).toBe(401);
     expect(projectMemberFindMany).not.toHaveBeenCalled();
@@ -65,7 +66,7 @@ describe("GET /api/projects", () => {
       },
     ]);
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost"));
     const body = await response.json();
 
     expect(response.status).toBe(200);

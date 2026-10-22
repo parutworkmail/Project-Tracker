@@ -26,6 +26,7 @@ vi.mock("@/lib/prisma", () => ({
       delete: projectDelete,
     },
   },
+  DbUnavailableError: class DbUnavailableError extends Error {},
 }));
 
 vi.mock("@/lib/permissions", () => ({

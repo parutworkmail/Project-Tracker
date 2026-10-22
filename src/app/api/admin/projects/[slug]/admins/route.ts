@@ -4,8 +4,9 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isSuperAdmin } from "@/lib/permissions";
 import { assignProjectAdminSchema } from "@/lib/validation/admin";
+import { withApiErrorHandling } from "@/lib/apiError";
 
-export async function POST(
+async function handlePOST(
   request: Request,
   { params }: { params: Promise<{ slug: string }> }
 ) {
@@ -76,3 +77,5 @@ export async function POST(
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }
+
+export const POST = withApiErrorHandling(handlePOST);

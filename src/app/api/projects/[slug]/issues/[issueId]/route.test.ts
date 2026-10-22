@@ -14,6 +14,7 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     project: { findUnique: projectFindUnique },
   },
+  DbUnavailableError: class DbUnavailableError extends Error {},
 }));
 
 vi.mock("@/lib/projectSchema", () => ({ updateIssueStatus }));

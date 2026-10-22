@@ -3,11 +3,12 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
+import { withApiErrorHandling } from "@/lib/apiError";
 
 const JOIN_LIMIT = 20;
 const JOIN_WINDOW_MS = 60 * 60 * 1000;
 
-export async function POST(
+async function handlePOST(
   request: Request,
   { params }: { params: Promise<{ slug: string }> }
 ) {
@@ -54,3 +55,5 @@ export async function POST(
 
   return NextResponse.json({ ok: true });
 }
+
+export const POST = withApiErrorHandling(handlePOST);

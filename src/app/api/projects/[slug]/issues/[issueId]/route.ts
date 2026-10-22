@@ -5,8 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { updateIssueStatus } from "@/lib/projectSchema";
 import { updateIssueStatusSchema } from "@/lib/validation/project";
 import { canAccessProject } from "@/lib/permissions";
+import { withApiErrorHandling } from "@/lib/apiError";
 
-export async function PATCH(
+async function handlePATCH(
   request: Request,
   { params }: { params: Promise<{ slug: string; issueId: string }> }
 ) {
@@ -60,3 +61,5 @@ export async function PATCH(
 
   return NextResponse.json(issue);
 }
+
+export const PATCH = withApiErrorHandling(handlePATCH);

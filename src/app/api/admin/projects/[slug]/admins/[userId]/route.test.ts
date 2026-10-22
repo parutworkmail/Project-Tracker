@@ -15,6 +15,7 @@ vi.mock("@/lib/prisma", () => ({
     project: { findUnique: projectFindUnique },
     projectAdmin: { deleteMany: projectAdminDeleteMany },
   },
+  DbUnavailableError: class DbUnavailableError extends Error {},
 }));
 
 import { DELETE } from "./route";

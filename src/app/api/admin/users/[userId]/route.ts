@@ -5,8 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { isSuperAdmin } from "@/lib/permissions";
 import { updateUserRoleSchema } from "@/lib/validation/admin";
+import { withApiErrorHandling } from "@/lib/apiError";
 
-export async function PATCH(
+async function handlePATCH(
   request: Request,
   { params }: { params: Promise<{ userId: string }> }
 ) {
@@ -58,7 +59,7 @@ export async function PATCH(
   });
 }
 
-export async function DELETE(
+async function handleDELETE(
   _request: Request,
   { params }: { params: Promise<{ userId: string }> }
 ) {
@@ -108,3 +109,6 @@ export async function DELETE(
 
   return NextResponse.json({ ok: true });
 }
+
+export const PATCH = withApiErrorHandling(handlePATCH);
+export const DELETE = withApiErrorHandling(handleDELETE);

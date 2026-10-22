@@ -6,8 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { isSuperAdmin } from "@/lib/permissions";
 import { createUserSchema } from "@/lib/validation/admin";
+import { withApiErrorHandling } from "@/lib/apiError";
 
-export async function GET() {
+async function handleGET() {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -33,7 +34,7 @@ export async function GET() {
   return NextResponse.json(users);
 }
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -111,3 +112,6 @@ export async function POST(request: Request) {
     throw error;
   }
 }
+
+export const GET = withApiErrorHandling(handleGET);
+export const POST = withApiErrorHandling(handlePOST);

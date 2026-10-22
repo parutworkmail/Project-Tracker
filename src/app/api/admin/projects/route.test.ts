@@ -11,6 +11,7 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     project: { findMany: projectFindMany },
   },
+  DbUnavailableError: class DbUnavailableError extends Error {},
 }));
 
 import { GET } from "./route";
@@ -24,7 +25,7 @@ describe("GET /api/admin/projects", () => {
   it("returns 401 when there is no session", async () => {
     authMock.mockResolvedValue(null);
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost"));
 
     expect(response.status).toBe(401);
     expect(projectFindMany).not.toHaveBeenCalled();
@@ -33,7 +34,7 @@ describe("GET /api/admin/projects", () => {
   it("returns 403 for a non-super-admin", async () => {
     authMock.mockResolvedValue({ user: { id: "user-1", role: "ADMIN" } });
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost"));
 
     expect(response.status).toBe(403);
     expect(projectFindMany).not.toHaveBeenCalled();
@@ -55,7 +56,7 @@ describe("GET /api/admin/projects", () => {
       },
     ]);
 
-    const response = await GET();
+    const response = await GET(new Request("http://localhost"));
     const body = await response.json();
 
     expect(response.status).toBe(200);

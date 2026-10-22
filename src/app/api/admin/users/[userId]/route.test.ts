@@ -13,6 +13,7 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: { findUnique: userFindUnique, update: userUpdate, delete: userDelete },
   },
+  DbUnavailableError: class DbUnavailableError extends Error {},
 }));
 
 import { Prisma } from "@/generated/prisma/client";
@@ -200,14 +201,19 @@ describe("DELETE /api/admin/users/[userId]", () => {
     expect(typeof body.error).toBe("string");
   });
 
-  it("rethrows non-P2003 errors instead of swallowing them", async () => {
+  it("returns a clean 500 (not a raw crash) for non-P2003 errors", async () => {
     authMock.mockResolvedValue({ user: { id: "super-1", role: "SUPER_ADMIN" } });
     userFindUnique.mockResolvedValue({ id: "user-2" });
     userDelete.mockRejectedValue(new Error("connection lost"));
 
-    await expect(
-      DELETE(new Request("http://localhost"), params("user-2"))
-    ).rejects.toThrow("connection lost");
+    const response = await DELETE(
+      new Request("http://localhost"),
+      params("user-2")
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(typeof body.error).toBe("string");
   });
 
   it("deletes the user and returns ok", async () => {

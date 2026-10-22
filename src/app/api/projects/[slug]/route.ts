@@ -5,8 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { dropProjectSchema } from "@/lib/projectSchema";
 import { updateProjectSchema } from "@/lib/validation/project";
 import { canManageProject } from "@/lib/permissions";
+import { withApiErrorHandling } from "@/lib/apiError";
 
-export async function GET(
+async function handleGET(
   _request: Request,
   { params }: { params: Promise<{ slug: string }> }
 ) {
@@ -47,7 +48,7 @@ export async function GET(
   });
 }
 
-export async function PATCH(
+async function handlePATCH(
   request: Request,
   { params }: { params: Promise<{ slug: string }> }
 ) {
@@ -97,7 +98,7 @@ export async function PATCH(
   });
 }
 
-export async function DELETE(
+async function handleDELETE(
   _request: Request,
   { params }: { params: Promise<{ slug: string }> }
 ) {
@@ -130,3 +131,7 @@ export async function DELETE(
 
   return NextResponse.json({ ok: true });
 }
+
+export const GET = withApiErrorHandling(handleGET);
+export const PATCH = withApiErrorHandling(handlePATCH);
+export const DELETE = withApiErrorHandling(handleDELETE);
