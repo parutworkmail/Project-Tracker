@@ -58,9 +58,10 @@ Logging". Shows exactly what was happening if the last session crashed.)
   clean (same pre-existing unrelated warnings), `npm run build`
   succeeds with the full expected route list. `package-lock.json` picked
   up the new postinstall hook (1-line diff, no dependency changes).
-- **Next**: commit and push to `origin` (now
-  `parutworkmail/Project-Tracker`) — user explicitly asked to push this
-  time.
+- **Next**: none — pushed. Commit `177d5d0` on `main`, pushed to
+  `parutworkmail/Project-Tracker`. Vercel should auto-redeploy on push
+  (if its GitHub integration triggers on push) — otherwise user needs to
+  trigger a redeploy manually from the Vercel dashboard.
 
 ## Session: Delete-user admin feature
 User tested the admin console and found no way to delete a user — only
