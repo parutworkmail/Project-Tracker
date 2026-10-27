@@ -6,6 +6,451 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
+- **Plan**: User wants to wrap up the day: run full validation (tsc +
+  lint + full test suite + build), and if everything passes, commit and
+  push all of today's work (route restructure to `/{slug}` + `/{slug}/
+  board` + `/{slug}/settings`, `(site)` route-group nav isolation,
+  `ProjectNav`/member management/issue-delete features, board loading
+  fix).
+- **Status**: in progress.
+
+- **Plan**: User reported the whole screen (including nav) shows a
+  generic "Loading..." on `/{slug}/board`, when only the task table
+  actually needs to wait on data — nav/header/create-button should
+  render instantly. Root cause: the page was one big async Server
+  Component awaiting `listIssues()` (a raw SQL query against the
+  project's own dynamic schema) before returning ANY markup, so Next's
+  route-level `loading.tsx` covered the entire page for the full
+  duration of that query, on top of the auth/project/membership/
+  canManage queries already needed just to decide access. Fix: split
+  the page so only the actual data-dependent part is wrapped in
+  `<Suspense>` — `ProjectNav` + the "Tasks" header + the "+ Create
+  issue" button/form render immediately (they don't need `issues`
+  data at all), only the `<table>` itself waits, with a small inline
+  "Loading tasks..." fallback instead of the full-page loader. New
+  `src/components/create-issue-button.tsx` (client, extracted from the
+  old `IssueBoard` — toggle button + form, no `issues` dependency).
+  Renamed/split old `issue-board.tsx` into `issue-table.tsx` (client,
+  pure table — status `<select>` + per-row Delete, same logic, just no
+  header/create-form baked in) + `issue-board-section.tsx` (new, async
+  Server Component that awaits `listIssues` then renders `IssueTable` —
+  this is the thing inside `<Suspense>`). `src/app/[slug]/board/
+  page.tsx` rewritten accordingly. Deleted old `issue-board.tsx`.
+  `npx next typegen` + `npx tsc --noEmit` clean, re-smoke-tested against
+  the user's running dev server (still 307s `/dashboard`→`/login`
+  correctly, confirms no crash from the restructure).
+- **Status**: done.
+- **Next**: none — task complete. Not committed yet. Full validation
+  sweep (lint/test/build) + commit/push only when the user asks.
+
+- **Plan**: User wants `ProjectNav` to visually match the CC (main site)
+  nav bar's look (full-width header styling, same layout pattern) but
+  WITHOUT duplicating its items — specifically flagged: can't tell who's
+  logged in and can't log out from a project page. Fix: convert
+  `ProjectNav` to a client component using `useSession`/`signOut` (same
+  pattern as `Nav`), restyle it as a `<header>` matching `Nav`'s exact
+  classes (border-b, px-6 py-3, justify-between), add username display +
+  "Sign out" button — but keep its own distinct nav items (project name/
+  board link, Settings, back-to-Dashboard) rather than copying
+  "Admin Dashboard"/"Admin" which are CC-only. tsc-only while developing.
+- **Status**: done. `ProjectNav` converted to a `"use client"` component
+  using `useSession`/`signOut` (same pattern as `Nav`), restyled from a
+  plain `<div>` into a `<header>` with the exact same classes as `Nav`
+  (`border-b`, `px-6 py-3`, `justify-between`) so it visually matches the
+  CC bar's chrome. Added username display + "Sign out" button on the
+  right, next to the existing "Dashboard" back-link — but kept its own
+  distinct left-side items (project name as the board link, "Settings"
+  for managers) rather than copying "Admin Dashboard"/"Admin". Moved
+  `<ProjectNav>` out of the padded `<main>` in both
+  `src/app/[slug]/board/page.tsx` and `src/app/[slug]/settings/page.tsx`
+  (now sits above `<main>`, full-width, matching how `Nav` sits above
+  page content in `(site)/layout.tsx` rather than being squeezed inside
+  a max-width content column). `npx next typegen` + `npx tsc --noEmit`
+  clean. Re-smoke-tested against the user's running dev server —
+  `/dashboard` still 307s to `/login` correctly, confirming no crash.
+- **Next**: none — task complete. Not committed yet. Full validation
+  sweep (lint/test/build) + commit/push only when the user asks.
+
+- **Plan**: User wants 4 changes: (1) clicking a project (any role) must
+  land on the task board, not the settings page — `/{slug}` becomes a
+  pure redirect-to-board for everyone (members already did this; now
+  managers do too), settings moves to a new `/{slug}/settings` route;
+  (2) remove the separate "Board" nav link from `ProjectNav` — the
+  project NAME itself becomes the link to the board (no redundant second
+  link); keep "Settings" link for managers; (3) the global `Nav`'s
+  "Dashboard" link must only show for SUPER_ADMIN, relabeled "Admin
+  Dashboard" (still points at `/dashboard` — only the main top nav
+  changes, `ProjectNav`'s own "Dashboard" link back to the central list
+  is unaffected, all roles still land on `/dashboard` via login redirect
+  regardless); (4) admin/super-admin must be able to delete a task — new
+  canManage-gated `DELETE /api/projects/[slug]/issues/[issueId]` +
+  `deleteIssue()` in `projectSchema.ts` + a Delete button per row in
+  `IssueBoard` (only rendered when `canManage` is true). tsc-only while
+  developing.
+- **Status**: done. (1) `src/app/[slug]/page.tsx` now ALWAYS redirects to
+  `/{slug}/board` for anyone who's a member or can manage (previously
+  only plain members got that, managers landed on settings) — only the
+  "not a member yet, join?" prompt still renders inline. Settings
+  content (name/slug edit, delete, member manager) moved to new
+  `src/app/[slug]/settings/page.tsx` (canManage-gated, redirects
+  non-managers to the board). `ProjectManageControls`'s redirect-on-
+  slug-change now targets `/{newSlug}/settings` (was `/{newSlug}`,
+  which would have redirected right back to the board — wrong page
+  after a rename). (2) `ProjectNav` redesigned: no more separate "Board"
+  link — the project NAME itself is now the link to `/{slug}/board`
+  (underlined when `active==="board"`); "Settings" link (canManage-only)
+  now points at `/{slug}/settings`. (3) `src/components/nav.tsx`: the
+  global "Dashboard" link is now SUPER_ADMIN-only and relabeled "Admin
+  Dashboard" (grouped with the existing "Admin" console link, same
+  gate) — non-super-admin users see no top-level nav link at all now
+  (still land on `/dashboard` via login/redirects regardless; only the
+  persistent nav link disappeared, per explicit instruction).
+  `ProjectNav`'s own "Dashboard" link (back to the central project list)
+  is untouched, still shown to everyone. (4) Issue delete: new
+  `deleteIssue()` in `src/lib/projectSchema.ts` (parameterized `DELETE
+  FROM "{schema}"."issues" WHERE id = $1`), new `DELETE` handler on
+  `src/app/api/projects/[slug]/issues/[issueId]/route.ts` gated by
+  `canManageProject` (not `canAccessProject` — plain members can't
+  delete, only admin/super-admin, per the ask), `IssueBoard` takes a new
+  `canManage` prop and renders a "Delete" button per row (with a
+  confirm dialog) only when true; wired `canManage` through from
+  `[slug]/board/page.tsx`. `npx next typegen` + `npx tsc --noEmit`
+  clean. Smoke-tested against the user's already-running dev server on
+  port 3000 — `/dashboard` still correctly 307s to `/login` with no
+  session, confirming the dev server picked up every change (route
+  moves, component rewrites) without crashing.
+- **Next**: none — task complete. Not committed yet. Full validation
+  sweep (lint/test/build) + commit/push only when the user asks.
+
+- **Plan**: User (frustrated, repeat clarification) restated the project
+  isolation requirement in concrete terms: (1) clicking a project link
+  MUST open in a new tab — each project is its own standalone "website"
+  (Google/Facebook/YouTube analogy — separate sites, centrally
+  "governed"/manageable, but not visually/structurally merged with the
+  main site), (2) project pages must NOT share the main site's nav
+  component or items. Root cause found: `src/app/layout.tsx` renders the
+  global `<Nav />` (Project Tracker / Dashboard / Admin / Sign out) for
+  EVERY route including `/{slug}` and `/{slug}/board`, so project pages
+  were showing both that global nav AND the separate `ProjectNav`
+  stacked together — never actually isolated. Plan: (a) move the main
+  site's pages (`/`, `/dashboard`, `/admin`, `/admin/users/new`,
+  `/login`, `/change-password`) into a `(site)` route group with its own
+  `layout.tsx` that renders `<Nav />` — route groups don't add to the
+  URL, so none of these paths change; (b) strip `<Nav />` out of the
+  root `layout.tsx` entirely (keeps only `<html>/<body>/<Providers>`);
+  this means `[slug]` and `[slug]/board` (which stay outside the group)
+  render with ZERO shared chrome from the main site — only their own
+  `ProjectNav`; (c) `target="_blank" rel="noopener noreferrer"` on every
+  project-link `<Link>` in `/dashboard`'s project list. tsc-only while
+  developing.
+- **Status**: done. `mv` failed with "Access is denied" on every directory
+  (likely a OneDrive sync lock on the source) — worked around with `cp -r`
+  into the new location + `rm -rf` on the old one, confirmed every nested
+  file (e.g. `admin/users/new/page.tsx`, `dashboard/loading.tsx`) came
+  along correctly before deleting originals. Final layout: `src/app/
+  (site)/` now holds `page.tsx`, `dashboard/`, `admin/` (+ nested
+  `users/new/`), `login/`, `change-password/`, plus a new `(site)/
+  layout.tsx` that renders `<Nav />` — route groups don't add a URL
+  segment, so `/`, `/dashboard`, `/admin`, `/admin/users/new`, `/login`,
+  `/change-password` are all unchanged. Root `src/app/layout.tsx` now
+  renders ONLY `<html>/<body>/<Providers>{children}</Providers>` — no
+  `<Nav />` — so `[slug]` and `[slug]/board` (left outside the group)
+  render with ZERO shared chrome from the main site, only their own
+  `ProjectNav` (which already omits "Admin console" — confirmed it only
+  ever showed Settings/Board/Dashboard). Added `target="_blank"
+  rel="noopener noreferrer"` to the project `<Link>` in `/dashboard`'s
+  list so clicking a project opens it in a new tab like an external
+  site. `npx next typegen` + `npx tsc --noEmit` clean. Smoke-tested
+  against the user's own already-running dev server on port 3000 (found
+  via a failed `next dev` attempt on a different port — correctly backed
+  off instead of killing their server): `/` renders with
+  `(site)/layout.tsx` + `Nav` present in the RSC payload, `/login` same,
+  `/dashboard` correctly 307-redirects to `/login` with no session —
+  confirms the route group move didn't break any existing URL.
+- **Next**: none — task complete. Not committed yet. Full validation
+  sweep (lint/test/build) + commit/push only when the user asks.
+
+- **Plan**: User wants `/{slug}/board` reworked: (1) remove the "Back to
+  dashboard" link and the "Shareable link: ..." text — redundant since
+  you're already on that exact URL, (2) add real project-scoped
+  navigation (topbar), since the only way back right now was that one
+  removed link, (3) the board should NOT show the create-issue form by
+  default — landing view is just a table of tasks; a "+ Create issue"
+  button toggles the form open, (4) issue list becomes an actual table
+  (columns), not stacked cards. Plan: new `ProjectNav` component
+  (project name + Board/Settings(if canManage)/Dashboard links) used on
+  both `/{slug}` and `/{slug}/board` for consistency; new `IssueBoard`
+  client component wrapping create-toggle + a proper `<table>` replacing
+  `IssueCard`'s stacked-card list (status via inline `<select>` per row,
+  more compact in a table cell than 3 buttons); delete `IssueCard`
+  (fully replaced, zero other references). tsc-only while developing.
+- **Status**: done. New `src/components/project-nav.tsx` — small topbar
+  (project name + Board/Settings(if canManage)/Dashboard links,
+  highlights the active one) — now rendered on BOTH `/{slug}` and
+  `/{slug}/board`, replacing the old ad-hoc `BackLink` + manual
+  member-count header on each page; this is the real navigation that
+  makes the removed "back to dashboard" link unnecessary. New
+  `src/components/issue-board.tsx` — client component: landing state is
+  just a `<table>` of tasks (Title/Description/Status columns, status
+  changed via inline `<select>` per row instead of 3 buttons, more
+  compact in a table cell); a "+ Create issue" button toggles the
+  title/description form open (hidden by default, `Cancel` closes it
+  again). `src/app/[slug]/board/page.tsx` rewritten: dropped the
+  `BackLink` and the "Shareable link: ..." paragraph (redundant — you're
+  already on that URL), now renders `ProjectNav` + `IssueBoard`.
+  `src/app/[slug]/page.tsx` also switched to `ProjectNav` for
+  consistency between the two project-scoped pages. Deleted
+  `src/components/issue-card.tsx` and `create-issue-form.tsx` (fully
+  replaced by `IssueBoard`, confirmed zero remaining references via
+  grep). `npx next typegen` + `npx tsc --noEmit` clean.
+- **Next**: none — task complete. Not committed yet. Full validation
+  sweep (lint/test/build) + commit/push only when the user asks.
+
+- **Plan**: User wants ALL extra "manage" buttons removed — confirmed via
+  ask_user they mean both: (1) the "Manage projects" link on `/dashboard`
+  that goes to the separate `/admin-project` list page, and (2) the
+  "Manage project" link on `/[slug]/board` that goes back to `/[slug]`.
+  Rationale: clicking a project should be the ONE way in — `/[slug]`
+  itself already shows management controls for whoever canManage it, so
+  a second list page and a second in-board shortcut are redundant.
+  Plan: (a) dashboard's project list becomes the single unified entry
+  point — merge plain ProjectMember rows with projects an ADMIN manages
+  via ProjectAdmin but isn't a member of (the actual reason
+  `/admin-project` existed), so nothing becomes unreachable; (b) delete
+  `src/app/admin-project/` entirely (page + the now-unused
+  `canManageAnyProject` dashboard link); (c) remove the "Manage project"
+  link from `/[slug]/board/page.tsx` (the existing "Back to dashboard"
+  BackLink is enough to get back). Keep the separate "Admin console"
+  link (global user management) — that's a different, legitimately
+  separate function. tsc-only while developing.
+- **Status**: done. `src/app/dashboard/page.tsx` is now the single entry
+  point: SUPER_ADMIN sees every project (`prisma.project.findMany`, no
+  membership needed); everyone else sees their `ProjectMember` rows
+  merged with any projects an ADMIN manages via `ProjectAdmin` without
+  being a member (deduped by id) — this merge is exactly why
+  `/admin-project` existed, so nothing became unreachable by deleting
+  it. Every project row links to `/${slug}` only; `/${slug}` itself
+  already branches into manage-controls vs. board-redirect vs. join-
+  prompt, so there's exactly one click path now. Deleted
+  `src/app/admin-project/` entirely (page + implicit route). Removed the
+  "Manage project" shortcut from `src/app/[slug]/board/page.tsx` (the
+  existing "Back to dashboard" `BackLink` already covers getting back).
+  Removed the now-dead `canManageAnyProject` from `src/lib/permissions.ts`
+  (existed solely for the deleted list page, no other caller, no test
+  coverage). Kept the "Admin console" link on `/dashboard` — that's
+  global user management, a genuinely separate function, not part of
+  this redundancy. `npx next typegen` + `npx tsc --noEmit` clean. Grep
+  confirms no remaining `/admin-project` route references in `src/`
+  (one harmless leftover: the string stays in `RESERVED_SLUGS`, which is
+  fine — it costs nothing to keep a word reserved even after its route
+  is gone).
+- **Next**: none — task complete. Not committed yet. Full validation
+  sweep (lint/test/build) + commit/push only when the user asks.
+
+- **Plan**: User corrected the architecture again, more fundamentally this
+  time: each project is meant to feel like its own "child app" rooted at
+  the project's OWN slug as a top-level URL segment
+  (`localhost:3000/projectA/...`), like Jira's per-project subdomains —
+  not nested under a shared `/project/...` or `/admin-project/...` path.
+  Clicking a project (as whoever can manage it) opens that project's own
+  home at `/{slug}` showing BOTH edit controls (name/slug/delete/members)
+  AND a "navigate in" action to the task board; a plain member skips
+  straight to the board. Confirmed via ask_user: (1) normal ADMINs (not
+  just SUPER_ADMIN) get the same manage powers for projects they're
+  assigned to — already true via existing `canManageProject`, no change
+  needed there, (2) slug collisions with real app routes (`/dashboard`,
+  `/admin`, `/admin-project`, `/login`, `/api`, etc.) must be blocked at
+  create/edit time via a reserved-word check, not left to silently break.
+  Plan: new root-level dynamic route `src/app/[slug]/page.tsx` (project
+  home: manage controls + "Open task board" link, or auto-redirect to
+  the board for plain members) + `src/app/[slug]/board/page.tsx` (task
+  board, shareable link target). Delete old `src/app/project/` and
+  `src/app/admin-project/[slug]/` directories (keep `src/app/admin-
+  project/page.tsx`, the global cross-project list, just repoint its
+  links). Add `RESERVED_SLUGS` + a Zod `.refine()` on the editable slug
+  field in `updateProjectSchema`. Fix every internal link/redirect
+  target accordingly. tsc-only while developing; full sweep + commit/
+  push only if/when asked.
+- **Status**: done. Most of this was already on disk when I re-checked
+  (likely from an uncommitted in-progress state): `src/app/[slug]/
+  page.tsx` (project home — manage controls + "Open task board" link for
+  managers, auto-redirect to `/{slug}/board` for plain members, join
+  prompt for neither), `src/app/[slug]/board/page.tsx` (task board, now
+  the shareable-link target), `RESERVED_SLUGS`/`isReservedSlug` in
+  `src/lib/slug.ts`, and the reserved-word `.refine()` on
+  `updateProjectSchema`'s slug field were all already in place and
+  correct. Old `src/app/project/` and `src/app/admin-project/[slug]/`
+  directories were already gone; `src/app/admin-project/page.tsx` (the
+  cross-project list) already linked to `/${slug}` correctly;
+  `src/app/dashboard/page.tsx` already linked to `/${slug}` for every
+  project uniformly (role branching now happens entirely inside
+  `[slug]/page.tsx` itself, so dashboard no longer needs its own
+  per-project `canManage` lookup — simpler than my last fix).
+  Found and fixed 2 real leftover bugs during the audit: (1)
+  `create-project-form.tsx` still redirected a newly-created project to
+  the OLD `/admin-project/${slug}` path (would have 404'd — that route no
+  longer exists) → fixed to `/${slug}`; (2) `project-manage-controls.tsx`
+  had the same stale `/admin-project/${updated.slug}` target in its
+  redirect-on-slug-change path → fixed to `/${updated.slug}`. Also fixed
+  a stale `/projects/` prefix label next to the slug input (cosmetic,
+  the editable link is root-level now, so it just reads `/` + the slug).
+  `npx next typegen` (regenerates `.next/types` for the new root `[slug]`
+  route without a full build) + `npx tsc --noEmit` clean. Full grep sweep
+  confirms zero remaining references to the deleted `/project/` or
+  `/admin-project/[slug]` paths anywhere in `src/`.
+- **Next**: none — task complete. Not committed yet (ask first, per
+  rule). Full validation sweep (lint/test/build) + commit/push only when
+  the user asks.
+
+- **Plan**: User asked where the link to the actual task board is from
+  `/admin-project/[slug]`. Confirmed: nowhere — that page only has name/
+  slug/member management, no way back to `/project/[slug]`. Adding an
+  "Open task board" link.
+- **Status**: done. `src/app/admin-project/[slug]/page.tsx`: added an
+  "Open task board" link next to the project name, pointing at
+  `/project/${slug}` — the only way to reach the actual task board from
+  the management page was previously the raw shareable-link text inside
+  `ProjectManageControls`'s own display, not an obvious nav action.
+  `npx tsc --noEmit` clean.
+- **Next**: none — task complete. Not committed yet.
+
+- **Plan**: User (angry, repeat issue) reported that logging in as
+  SUPER_ADMIN and clicking a project from `/dashboard`'s "Your projects"
+  list still shows BOTH the "Manage project" link AND the issue-title
+  input box on the same page. Root cause found: that list always links
+  to `/project/[slug]` (the task board) for every project the user is a
+  member of, regardless of role — and SUPER_ADMIN is auto-added as a
+  member of every project they create, so they land on the task board
+  (which still shows its own "Manage project" shortcut) instead of
+  going straight to `/admin-project/[slug]` as intended. Fix: compute
+  per-project `canManage` on the dashboard and route managed projects to
+  `/admin-project/[slug]`, non-managed (plain member) projects to
+  `/project/[slug]`.
+- **Status**: done. `src/app/dashboard/page.tsx`: computes `canManage`
+  per project (via `canManageProject`) alongside the existing membership
+  list, and the project link now goes to `/admin-project/${slug}` when
+  the user can manage that project, `/project/${slug}` otherwise. A
+  SUPER_ADMIN (always `canManage=true` for every project) now lands
+  directly on the management page from their dashboard, never the task
+  board with its own duplicate "Manage project" shortcut. Plain members
+  (and admins not assigned to that specific project) still go to the
+  task board as before. `npx tsc --noEmit` clean.
+- **Next**: none — task complete. Not committed yet (ask first, per
+  rule). Full validation sweep only when asked.
+
+- **Plan**: User reported seeing the "Database is currently unavailable"
+  banner on app startup without logging in, and asked (1) why it shows
+  before any login action, (2) if it's a real connectivity failure, why.
+  Investigate only — no code changes expected unless a real bug is found.
+- **Status**: done (diagnosis only, no code change needed). (1) Why it
+  shows pre-login: `Nav` is rendered in the root layout on EVERY page
+  (`src/app/layout.tsx:31`), and calls `useSession()`, which hits
+  NextAuth's `/api/auth/session` → the `session()` callback in
+  `src/auth.ts` on every page load — this runs for any EXISTING session
+  cookie, not just a fresh login. NextAuth JWT sessions persist across
+  app restarts (it's a cookie, not in-memory), so reopening the app while
+  still holding a valid cookie from a prior login re-triggers the DB
+  lookup without the user doing anything that session. (2) Confirmed via
+  a direct raw `pg` connection test (same `SUPABASE_DB_HOST/USER/
+  PASSWORD` from `.env`) that the DB IS reachable right now — not a
+  real outage, env vars are all present and correct. Matches the
+  already-documented fragility (see "Session: Vercel DB connectivity
+  fix" further down): local dev's `.env` uses Supabase's direct-connection
+  host, which resolves IPv6-only, so it's sensitive to transient local
+  network blips (wifi switch, sleep/wake, VPN) — `session()`'s catch
+  block then sets `dbUnavailable: true` on whatever single query attempt
+  failed, which is correct/working-as-designed behavior for a real
+  transient failure, it just doesn't retry. No code bug found; told user
+  it's very likely a one-off network blip, suggested restarting the dev
+  server if it persists (clears the dev-mode-cached global Prisma client
+  in `src/lib/prisma.ts`, forcing a fresh connection pool).
+- **Next**: none — answered user's question directly in chat. No files
+  changed this entry.
+
+- **Plan**: User corrected my understanding of the site architecture and
+  asked for a real route split (not just a visual one): (1) issue
+  title/description/"Add issue"/"No issues yet" (task CRUD) must live
+  under a `/project/[slug]` (singular) namespace — the actual per-project
+  task board regular members use, reached from their personal
+  `/dashboard` project list and from the shareable link, (2) today's
+  `/projects/[slug]` page (plural, the one I'd turned into settings) gets
+  renamed/moved to a new `/admin-project/[slug]` namespace — a central
+  project-management page (name/slug/members/delete) with NO issue CRUD
+  at all, (3) new `/admin-project` list page — this is "to handle every
+  project under this repo": SUPER_ADMIN sees every project, an assigned
+  ADMIN sees only the projects they're assigned to (reusing the existing
+  `canManageProject` permission model). Plan: move page files (API routes
+  under `/api/projects/...` stay as-is, this is a frontend page-route
+  reorg only), fix every internal link/redirect target, add a
+  `canManageAnyProject` permission helper for the dashboard's new
+  "Manage projects" entry point and the list page's own gate. tsc-only
+  while developing; full sweep + commit/push only if/when asked.
+- **Status**: done. Route reorg complete (frontend pages only — `/api/
+  projects/...` left untouched, that's the backend REST path, unrelated):
+  - `src/app/project/[slug]/page.tsx` (new, singular) — the task board:
+    issue form/list restored here (same content the old `/projects/[slug]`
+    had), shareable link now correctly points at `/project/${slug}`
+    itself, "Manage project" link → `/admin-project/${slug}` (canManage
+    only).
+  - `src/app/admin-project/[slug]/page.tsx` (new) — central project
+    management: name/slug edit + members (`ProjectManageControls` +
+    `ProjectMemberManager`, moved as-is from the old `/projects/[slug]/
+    settings`), no issue CRUD at all. canManage-gated, redirects
+    non-managers to `/dashboard`. Back link → `/admin-project` (the list).
+  - `src/app/admin-project/page.tsx` (new, list) — "handle every project
+    under this repo": SUPER_ADMIN sees every project, an assigned ADMIN
+    sees only projects they're assigned to (`ProjectAdmin` rows), each
+    row links to `/admin-project/[slug]`. New `canManageAnyProject()` in
+    `src/lib/permissions.ts` gates this + a new "Manage projects" link on
+    `/dashboard` (only shown to users who can actually manage ≥1 project).
+  - Old `src/app/projects/` directory deleted entirely (`page.tsx`,
+    `loading.tsx`, `settings/page.tsx` all migrated above).
+  - Updated redirect/push targets: `create-project-form.tsx` →
+    `/admin-project/${slug}` after creation (creator is auto-added as a
+    member too, so they can still reach the task board via `/dashboard`
+    or the shareable link), `project-manage-controls.tsx`'s
+    redirect-on-slug-change → `/admin-project/${newSlug}`.
+  - `.next/types` had a stale reference to the deleted `/projects/[slug]`
+    route after the directory removal — fixed with `npx next typegen`
+    (lightweight, not a full build) instead of a full `next build`.
+  - `npx tsc --noEmit` clean.
+- **Next**: none — task complete. Full validation sweep + commit/push
+  only when the user asks.
+
+- **Plan**: User clarified the real architecture (multi-project "Jira-like"
+  host) and asked for two fixes: (1) member management was missing from
+  the project "Edit" controls (showed "1 member" with no way to view/add/
+  remove them — confirmed via ask_user: whoever canManageProject gets
+  full view/add/edit/delete on members), (2) the shareable link should
+  open the actual project TASK DASHBOARD (add/edit/delete task), not a
+  settings view — confirmed via ask_user: split into a dashboard page
+  (`/projects/[slug]`, restores the issue board I removed last task) and
+  a separate settings page (`/projects/[slug]/settings`, name/slug/
+  members/delete), reached via a "Manage project" link, not shown inline
+  on the dashboard anymore. New member endpoints:
+  `POST/DELETE /api/projects/[slug]/members[/[userId]]` (canManage-gated,
+  add-by-username, remove). New `ProjectMemberManager` component. tsc-only
+  while developing per the validation-tiers rule; full sweep + commit/push
+  only if/when asked.
+- **Status**: done. `src/app/projects/[slug]/page.tsx` is now the actual
+  task dashboard again (restored `CreateIssueForm`/`IssueCard`/
+  `listIssues`); shareable link `<a>` stays, now correctly points at this
+  same dashboard. Added a "Manage project" link (canManage-only) to new
+  `src/app/projects/[slug]/settings/page.tsx` (canManage-gated, redirects
+  non-managers back to the dashboard) which hosts `ProjectManageControls`
+  (name/slug edit, delete — unchanged logic, redirect-on-slug-change now
+  targets `.../settings` instead of the dashboard) plus a new
+  `ProjectMemberManager` component (view members, remove one, add by
+  username). New API: `POST /api/projects/[slug]/members` (canManage-
+  gated, looks up target by username, 404 if not found, catches Prisma
+  P2002 → 409 "already a member"), `DELETE
+  /api/projects/[slug]/members/[userId]` (canManage-gated, 404 if not
+  currently a member). New `addProjectMemberSchema` in
+  `src/lib/validation/project.ts`. `npx tsc --noEmit` clean (tsc-only per
+  the validation-tiers rule — no full sweep/commit/push since not asked).
+- **Next**: none — task complete. Full validation sweep + commit/push
+  only when the user asks.
+
 - **Plan**: User wants the project detail page (`/projects/[slug]`)
   reworked: (1) remove the issue title/description "add issue" form and the
   issue list entirely from the page, (2) the "Shareable link: ..." text
@@ -36,7 +481,11 @@ Logging". Shows exactly what was happening if the last session crashed.)
   `route.test.ts` → 16/16 passing. `npx tsc --noEmit` clean.
 - **Next**: none — task complete. Issue UI re-add is a separate future
   task per user's own note ("prepare to add them at those each project").
-  Not committed yet (ask first, per rule).
+  Committed `6d96e2a` (bundled with the login-redirect and back-link work
+  above) and pushed to `origin/main` — user explicitly asked to push.
+  Full pre-push sweep run: `npx tsc --noEmit` clean, `npm run lint` clean
+  (same 2 pre-existing unrelated warnings only), `npm test` → 211/211
+  passing, `npm run build` succeeds with the correct 15-route list.
   instead of `/`.
 - **Status**: done. `src/app/login/page.tsx` — `router.push("/")` →
   `router.push("/dashboard")` after successful credentials sign-in.

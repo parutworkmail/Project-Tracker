@@ -97,3 +97,15 @@ export async function updateIssueStatus(
 
   return rows[0];
 }
+
+export async function deleteIssue(
+  schemaName: string,
+  issueId: string
+): Promise<void> {
+  assertValidSchemaName(schemaName);
+
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM "${schemaName}"."issues" WHERE id = $1`,
+    issueId
+  );
+}

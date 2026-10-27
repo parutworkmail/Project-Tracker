@@ -25,13 +25,15 @@ export function Nav() {
         <nav className="flex items-center gap-4 text-sm">
           {status === "authenticated" ? (
             <>
-              <Link href="/dashboard" className="hover:underline">
-                Dashboard
-              </Link>
               {session.user?.role === "SUPER_ADMIN" && (
-                <Link href="/admin" className="hover:underline">
-                  Admin
-                </Link>
+                <>
+                  <Link href="/dashboard" className="hover:underline">
+                    Admin Dashboard
+                  </Link>
+                  <Link href="/admin" className="hover:underline">
+                    Admin
+                  </Link>
+                </>
               )}
               <span className="text-zinc-500">{session.user?.username}</span>
               <button

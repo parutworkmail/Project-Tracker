@@ -18,13 +18,11 @@ export default async function DashboardPage() {
     redirect("/change-password");
   }
 
-  const memberships = await prisma.projectMember.findMany({
-    where: { userId: session.user.id },
-    include: { project: true },
-    orderBy: { createdAt: "desc" },
-  });
-
   const isSuperAdmin = session.user.role === "SUPER_ADMIN";
+
+  const projects = isSuperAdmin
+    ? await prisma.project.findMany({ orderBy: { createdAt: "desc" } })
+    : await mergeMemberAndManagedProjects(session.user.id, session.user.role);
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
@@ -47,7 +45,7 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        {memberships.length === 0 ? (
+        {projects.length === 0 ? (
           <p className="text-zinc-500">
             No projects yet.{" "}
             {isSuperAdmin
@@ -56,10 +54,12 @@ export default async function DashboardPage() {
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {memberships.map(({ project }) => (
+            {projects.map((project) => (
               <li key={project.id}>
                 <Link
-                  href={`/projects/${project.slug}`}
+                  href={`/${project.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="flex items-center justify-between rounded border border-black/[.08] bg-white px-4 py-3 hover:bg-black/[.02] dark:border-white/[.145] dark:bg-black dark:hover:bg-white/[.04]"
                 >
                   <span className="font-medium">{project.name}</span>
@@ -71,4 +71,26 @@ export default async function DashboardPage() {
       </main>
     </div>
   );
+}
+
+async function mergeMemberAndManagedProjects(userId: string, role: string) {
+  const [memberships, managed] = await Promise.all([
+    prisma.projectMember.findMany({
+      where: { userId },
+      include: { project: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    role === "ADMIN"
+      ? prisma.project.findMany({
+          where: { admins: { some: { userId } } },
+          orderBy: { createdAt: "desc" },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const memberProjects = memberships.map((m) => m.project);
+  const seen = new Set(memberProjects.map((p) => p.id));
+  const extra = managed.filter((p) => !seen.has(p.id));
+
+  return [...memberProjects, ...extra];
 }

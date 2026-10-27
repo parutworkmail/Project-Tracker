@@ -10,8 +10,9 @@ import {
   type CreateIssueInput,
 } from "@/lib/validation/project";
 
-export function CreateIssueForm({ slug }: { slug: string }) {
+export function CreateIssueButton({ slug }: { slug: string }) {
   const router = useRouter();
+  const [isCreating, setIsCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
@@ -23,7 +24,7 @@ export function CreateIssueForm({ slug }: { slug: string }) {
     resolver: zodResolver(createIssueSchema),
   });
 
-  async function onSubmit(data: CreateIssueInput) {
+  async function onCreate(data: CreateIssueInput) {
     setFormError(null);
 
     const res = await fetch(`/api/projects/${slug}/issues`, {
@@ -41,11 +42,27 @@ export function CreateIssueForm({ slug }: { slug: string }) {
     }
 
     reset();
+    setIsCreating(false);
     router.refresh();
   }
 
+  if (!isCreating) {
+    return (
+      <button
+        type="button"
+        onClick={() => setIsCreating(true)}
+        className="rounded bg-foreground px-3 py-1 text-sm text-background"
+      >
+        + Create issue
+      </button>
+    );
+  }
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-2">
+    <form
+      onSubmit={handleSubmit(onCreate)}
+      className="flex w-80 flex-col gap-2 rounded border border-black/[.08] bg-white p-4 dark:border-white/[.145] dark:bg-black"
+    >
       <div className="flex flex-col gap-1">
         <input
           type="text"
@@ -64,17 +81,28 @@ export function CreateIssueForm({ slug }: { slug: string }) {
           className="rounded border border-black/[.08] px-3 py-2 dark:border-white/[.145] dark:bg-black"
         />
         {errors.description && (
-          <p className="text-sm text-red-600">{errors.description.message}</p>
+          <p className="text-sm text-red-600">
+            {errors.description.message}
+          </p>
         )}
       </div>
       {formError && <p className="text-sm text-red-600">{formError}</p>}
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="w-fit rounded bg-foreground px-4 py-2 text-background disabled:opacity-50"
-      >
-        {isSubmitting ? "Adding..." : "Add issue"}
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-fit rounded bg-foreground px-4 py-2 text-background disabled:opacity-50"
+        >
+          {isSubmitting ? "Adding..." : "Add issue"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsCreating(false)}
+          className="w-fit rounded border border-black/[.08] px-4 py-2 dark:border-white/[.145]"
+        >
+          Cancel
+        </button>
+      </div>
     </form>
   );
 }

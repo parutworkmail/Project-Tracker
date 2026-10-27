@@ -1,15 +1,18 @@
 import { redirect, notFound } from "next/navigation";
+import { Suspense } from "react";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageProject } from "@/lib/permissions";
 import { JoinProjectButton } from "@/components/join-project-button";
-import { ProjectManageControls } from "@/components/project-manage-controls";
+import { CreateIssueButton } from "@/components/create-issue-button";
+import { IssueBoardSection } from "@/components/issue-board-section";
+import { ProjectNav } from "@/components/project-nav";
 import { BackLink } from "@/components/back-link";
 
 export const instant = false;
 
-export default async function ProjectPage({
+export default async function ProjectBoardPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
@@ -57,33 +60,28 @@ export default async function ProjectPage({
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-12">
-        <BackLink href="/dashboard" label="Back to dashboard" />
-        <div className="mb-2 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">{project.name}</h1>
-          <span className="text-xs text-zinc-500">
-            {project.members.length} member
-            {project.members.length !== 1 ? "s" : ""}
-          </span>
+      <ProjectNav
+        slug={project.slug}
+        name={project.name}
+        active="board"
+        canManage={canManage}
+      />
+
+      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+          <h1 className="text-xl font-semibold">Tasks</h1>
+          <CreateIssueButton slug={project.slug} />
         </div>
 
-        {canManage && (
-          <div className="mb-4">
-            <ProjectManageControls slug={project.slug} name={project.name} />
-          </div>
-        )}
-
-        <p className="mb-8 text-sm text-zinc-500">
-          Shareable link:{" "}
-          <a
-            href={`/projects/${project.slug}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded bg-black/[.06] px-1.5 py-0.5 hover:underline dark:bg-white/[.08]"
-          >
-            /projects/{project.slug}
-          </a>
-        </p>
+        <Suspense
+          fallback={<p className="text-zinc-500">Loading tasks...</p>}
+        >
+          <IssueBoardSection
+            slug={project.slug}
+            schemaName={project.schemaName}
+            canManage={canManage}
+          />
+        </Suspense>
       </main>
     </div>
   );

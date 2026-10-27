@@ -42,7 +42,7 @@ export function CreateProjectForm() {
 
     const project = await res.json();
     reset();
-    router.push(`/projects/${project.slug}`);
+    router.push(`/${project.slug}`);
     router.refresh();
   }
 

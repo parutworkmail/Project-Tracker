@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { isReservedSlug } from "@/lib/slug";
+
 export const createProjectSchema = z.object({
   name: z.string().min(1, "Project name is required.").max(80),
 });
@@ -17,6 +19,9 @@ export const updateProjectSchema = z
         /^[a-z0-9]+(-[a-z0-9]+)*$/,
         "Only lowercase letters, numbers, and hyphens are allowed."
       )
+      .refine((slug) => !isReservedSlug(slug), {
+        message: "This shareable link is reserved and cannot be used.",
+      })
       .optional(),
   })
   .refine((data) => data.name !== undefined || data.slug !== undefined, {
@@ -24,6 +29,12 @@ export const updateProjectSchema = z
   });
 
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
+
+export const addProjectMemberSchema = z.object({
+  username: z.string().min(1, "Username is required."),
+});
+
+export type AddProjectMemberInput = z.infer<typeof addProjectMemberSchema>;
 
 export const createIssueSchema = z.object({
   title: z.string().min(1, "Title is required.").max(200),

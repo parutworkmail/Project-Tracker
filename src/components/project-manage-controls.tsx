@@ -52,7 +52,7 @@ export function ProjectManageControls({
     setIsEditing(false);
 
     if (updated.slug !== slug) {
-      router.push(`/projects/${updated.slug}`);
+      router.push(`/${updated.slug}/settings`);
     } else {
       router.refresh();
     }
@@ -110,7 +110,7 @@ export function ProjectManageControls({
             Shareable link
           </label>
           <div className="flex items-center gap-1">
-            <span className="text-xs text-zinc-500">/projects/</span>
+            <span className="text-xs text-zinc-500">/</span>
             <input
               id="project-slug"
               type="text"

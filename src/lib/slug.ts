@@ -20,3 +20,26 @@ export function buildUniqueSlug(name: string): string {
   const base = slugify(name) || "project";
   return `${base}-${randomSuffix()}`;
 }
+
+// Every top-level static route segment under src/app — a project's slug
+// becomes a root-level URL (e.g. /{slug}), so it must never collide with
+// one of these or that project becomes permanently unreachable (Next.js
+// always prefers a static route over the dynamic [slug] catch-all).
+export const RESERVED_SLUGS = new Set([
+  "admin",
+  "admin-project",
+  "dashboard",
+  "login",
+  "change-password",
+  "api",
+  "project",
+  "projects",
+  "_next",
+  "favicon.ico",
+  "robots.txt",
+  "sitemap.xml",
+]);
+
+export function isReservedSlug(slug: string): boolean {
+  return RESERVED_SLUGS.has(slug.toLowerCase());
+}
