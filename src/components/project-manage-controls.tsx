@@ -28,10 +28,10 @@ export function ProjectManageControls({
     formState: { errors, isSubmitting },
   } = useForm<UpdateProjectInput>({
     resolver: zodResolver(updateProjectSchema),
-    defaultValues: { name },
+    defaultValues: { name, slug },
   });
 
-  async function onRename(data: UpdateProjectInput) {
+  async function onSave(data: UpdateProjectInput) {
     setError(null);
 
     const res = await fetch(`/api/projects/${slug}`, {
@@ -43,13 +43,19 @@ export function ProjectManageControls({
     if (!res.ok) {
       const body = await res.json().catch(() => null);
       setError(
-        typeof body?.error === "string" ? body.error : "Rename failed."
+        typeof body?.error === "string" ? body.error : "Update failed."
       );
       return;
     }
 
+    const updated = await res.json();
     setIsEditing(false);
-    router.refresh();
+
+    if (updated.slug !== slug) {
+      router.push(`/projects/${updated.slug}`);
+    } else {
+      router.refresh();
+    }
   }
 
   async function onDelete() {
@@ -81,32 +87,60 @@ export function ProjectManageControls({
 
   if (isEditing) {
     return (
-      <form
-        onSubmit={handleSubmit(onRename)}
-        className="flex items-center gap-2"
-      >
-        <input
-          type="text"
-          {...register("name")}
-          className="rounded border border-black/[.08] px-2 py-1 text-sm dark:border-white/[.145] dark:bg-black"
-        />
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="rounded bg-foreground px-2 py-1 text-xs text-background disabled:opacity-50"
-        >
-          Save
-        </button>
-        <button
-          type="button"
-          onClick={() => setIsEditing(false)}
-          className="rounded border border-black/[.08] px-2 py-1 text-xs dark:border-white/[.145]"
-        >
-          Cancel
-        </button>
-        {errors.name && (
-          <span className="text-xs text-red-600">{errors.name.message}</span>
-        )}
+      <form onSubmit={handleSubmit(onSave)} className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="project-name" className="text-xs font-medium">
+            Project name
+          </label>
+          <input
+            id="project-name"
+            type="text"
+            {...register("name")}
+            className="rounded border border-black/[.08] px-2 py-1 text-sm dark:border-white/[.145] dark:bg-black"
+          />
+          {errors.name && (
+            <span className="text-xs text-red-600">
+              {errors.name.message}
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="project-slug" className="text-xs font-medium">
+            Shareable link
+          </label>
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-zinc-500">/projects/</span>
+            <input
+              id="project-slug"
+              type="text"
+              {...register("slug")}
+              className="rounded border border-black/[.08] px-2 py-1 text-sm dark:border-white/[.145] dark:bg-black"
+            />
+          </div>
+          {errors.slug && (
+            <span className="text-xs text-red-600">
+              {errors.slug.message}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="rounded bg-foreground px-2 py-1 text-xs text-background disabled:opacity-50"
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsEditing(false)}
+            className="rounded border border-black/[.08] px-2 py-1 text-xs dark:border-white/[.145]"
+          >
+            Cancel
+          </button>
+        </div>
         {error && <span className="text-xs text-red-600">{error}</span>}
       </form>
     );

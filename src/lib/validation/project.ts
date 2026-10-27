@@ -6,9 +6,22 @@ export const createProjectSchema = z.object({
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 
-export const updateProjectSchema = z.object({
-  name: z.string().min(1, "Project name is required.").max(80),
-});
+export const updateProjectSchema = z
+  .object({
+    name: z.string().min(1, "Project name is required.").max(80).optional(),
+    slug: z
+      .string()
+      .min(3, "Shareable link must be at least 3 characters.")
+      .max(64, "Shareable link is too long.")
+      .regex(
+        /^[a-z0-9]+(-[a-z0-9]+)*$/,
+        "Only lowercase letters, numbers, and hyphens are allowed."
+      )
+      .optional(),
+  })
+  .refine((data) => data.name !== undefined || data.slug !== undefined, {
+    message: "At least one of name or shareable link is required.",
+  });
 
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 

@@ -6,6 +6,60 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
+- **Plan**: User wants the project detail page (`/projects/[slug]`)
+  reworked: (1) remove the issue title/description "add issue" form and the
+  issue list entirely from the page, (2) the "Shareable link: ..." text
+  should become an actual clickable `<a>` link that opens in a new tab,
+  (3) add ability to edit the project name (already exists via
+  `ProjectManageControls` — confirm/keep), (4) add ability to edit the
+  shareable link (slug) — new, not yet supported by the API, (5)
+  keep/confirm delete project (already exists — confirm/keep). This is prep
+  work — issue UI is being removed for now, to be re-added later per user's
+  "prepare to add them at those each project" note.
+- **Status**: done. `src/app/projects/[slug]/page.tsx`: removed the
+  `CreateIssueForm` / `IssueCard` / `listIssues` usage entirely (issue
+  components left in place under `src/components/` for later re-add, not
+  deleted). "Shareable link: ..." is now a real `<a target="_blank"
+  rel="noopener noreferrer">` instead of plain `<code>` text.
+  `ProjectManageControls` rewritten: edit mode now has both a Project name
+  field and a Shareable link (slug) field (pre-filled, both editable
+  together), redirects to the new slug's URL after a successful slug
+  change; delete button unchanged. `updateProjectSchema`
+  (`src/lib/validation/project.ts`) extended: `name`/`slug` both optional,
+  `.refine()` requires at least one, `slug` validated against
+  `^[a-z0-9]+(-[a-z0-9]+)*$` (matches the existing `buildUniqueSlug`
+  format). PATCH handler (`src/app/api/projects/[slug]/route.ts`) only
+  updates the provided field(s), catches Prisma P2002 (duplicate slug) →
+  409 "That shareable link is already taken." instead of a raw 500 (same
+  pattern as `admin/users` route). Added 3 new tests (slug update, 409 on
+  slug conflict, 400 on invalid slug format) to
+  `route.test.ts` → 16/16 passing. `npx tsc --noEmit` clean.
+- **Next**: none — task complete. Issue UI re-add is a separate future
+  task per user's own note ("prepare to add them at those each project").
+  Not committed yet (ask first, per rule).
+  instead of `/`.
+- **Status**: done. `src/app/login/page.tsx` — `router.push("/")` →
+  `router.push("/dashboard")` after successful credentials sign-in.
+  Confirmed `/` is a static marketing page (not an auto-redirect), so this
+  was a real behavior change, not a no-op. `npx tsc --noEmit` clean.
+- **Next**: none — task complete. Not committed yet (ask first, per rule).
+
+- **Plan**: User wants a "back" button added to pages that are NOT directly
+  reachable from the topbar nav (e.g. admin console accessed from dashboard
+  should have a back-to-dashboard button). Pages reachable directly via the
+  topbar itself don't need one (e.g. dashboard).
+- **Status**: done. Clarified rule via ask_user: any "sub-function" page gets
+  a back button, even Admin (despite being topbar-linked for SUPER_ADMIN).
+  New `src/components/back-link.tsx` (simple `← label` Link). Wired into:
+  `/admin` → back to `/dashboard`; `/admin/users/new` → back to `/admin`;
+  `/projects/[slug]` → back to `/dashboard` (both the full view and the
+  not-a-member "join" view); `/change-password` → back to `/dashboard`, but
+  only when `mustChangePassword` is false (forced password change shouldn't
+  offer an escape hatch back to a page that would just redirect here again).
+  Dashboard itself unchanged (it's the top-level landing page). `npx tsc
+  --noEmit` clean.
+- **Next**: none — task complete. Not committed yet (ask first, per rule).
+
 - **Plan**: User wants documentation generated: (1) a business/logic
   document describing what features currently exist, what they can and
   can't do (capabilities + known limitations), and (2) use case diagram

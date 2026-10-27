@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { UserRoleManager } from "@/components/admin/user-role-manager";
 import { ProjectAdminManager } from "@/components/admin/project-admin-manager";
+import { BackLink } from "@/components/back-link";
 
 export const instant = false;
 
@@ -46,6 +47,7 @@ export default async function AdminPage() {
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12">
+        <BackLink href="/dashboard" label="Back to dashboard" />
         <h1 className="mb-8 text-2xl font-semibold">Admin console</h1>
 
         <section className="mb-12">

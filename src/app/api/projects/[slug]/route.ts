@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
 import { dropProjectSchema } from "@/lib/projectSchema";
 import { updateProjectSchema } from "@/lib/validation/project";
 import { canManageProject } from "@/lib/permissions";
@@ -86,16 +87,34 @@ async function handlePATCH(
     );
   }
 
-  const updated = await prisma.project.update({
-    where: { id: project.id },
-    data: { name: parsed.data.name },
-  });
+  const data: { name?: string; slug?: string } = {};
+  if (parsed.data.name !== undefined) data.name = parsed.data.name;
+  if (parsed.data.slug !== undefined) data.slug = parsed.data.slug;
 
-  return NextResponse.json({
-    id: updated.id,
-    name: updated.name,
-    slug: updated.slug,
-  });
+  try {
+    const updated = await prisma.project.update({
+      where: { id: project.id },
+      data,
+    });
+
+    return NextResponse.json({
+      id: updated.id,
+      name: updated.name,
+      slug: updated.slug,
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return NextResponse.json(
+        { error: "That shareable link is already taken." },
+        { status: 409 }
+      );
+    }
+
+    throw error;
+  }
 }
 
 async function handleDELETE(

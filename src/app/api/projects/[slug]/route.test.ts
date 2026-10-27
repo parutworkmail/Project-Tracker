@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { Prisma } from "@/generated/prisma/client";
+
 const {
   authMock,
   projectFindUnique,
@@ -215,6 +217,63 @@ describe("PATCH /api/projects/[slug]", () => {
       where: { id: "p1" },
       data: { name: "Renamed" },
     });
+  });
+
+  it("updates the slug when the caller can manage it", async () => {
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "SUPER_ADMIN" } });
+    projectFindUnique.mockResolvedValue({ id: "p1", slug: "proj-ab12cd" });
+    canManageProject.mockResolvedValue(true);
+    projectUpdate.mockResolvedValue({
+      id: "p1",
+      name: "Proj",
+      slug: "new-link",
+    });
+
+    const response = await PATCH(
+      jsonRequest("PATCH", { slug: "new-link" }),
+      params("proj-ab12cd")
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.slug).toBe("new-link");
+    expect(projectUpdate).toHaveBeenCalledWith({
+      where: { id: "p1" },
+      data: { slug: "new-link" },
+    });
+  });
+
+  it("returns 409 when the new slug is already taken", async () => {
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "SUPER_ADMIN" } });
+    projectFindUnique.mockResolvedValue({ id: "p1", slug: "proj-ab12cd" });
+    canManageProject.mockResolvedValue(true);
+    projectUpdate.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+        code: "P2002",
+        clientVersion: "test",
+      })
+    );
+
+    const response = await PATCH(
+      jsonRequest("PATCH", { slug: "taken-link" }),
+      params("proj-ab12cd")
+    );
+
+    expect(response.status).toBe(409);
+  });
+
+  it("rejects an invalid slug format", async () => {
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "SUPER_ADMIN" } });
+    projectFindUnique.mockResolvedValue({ id: "p1", slug: "proj-ab12cd" });
+    canManageProject.mockResolvedValue(true);
+
+    const response = await PATCH(
+      jsonRequest("PATCH", { slug: "Not Valid!" }),
+      params("proj-ab12cd")
+    );
+
+    expect(response.status).toBe(400);
+    expect(projectUpdate).not.toHaveBeenCalled();
   });
 });
 

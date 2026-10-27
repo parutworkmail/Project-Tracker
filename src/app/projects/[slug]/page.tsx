@@ -2,12 +2,10 @@ import { redirect, notFound } from "next/navigation";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { listIssues } from "@/lib/projectSchema";
 import { canManageProject } from "@/lib/permissions";
 import { JoinProjectButton } from "@/components/join-project-button";
-import { CreateIssueForm } from "@/components/create-issue-form";
-import { IssueCard } from "@/components/issue-card";
 import { ProjectManageControls } from "@/components/project-manage-controls";
+import { BackLink } from "@/components/back-link";
 
 export const instant = false;
 
@@ -50,17 +48,17 @@ export default async function ProjectPage({
   if (!membership && !canManage) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 dark:bg-black">
+        <BackLink href="/dashboard" label="Back to dashboard" />
         <h1 className="mb-6 text-2xl font-semibold">{project.name}</h1>
         <JoinProjectButton slug={project.slug} />
       </div>
     );
   }
 
-  const issues = await listIssues(project.schemaName);
-
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
       <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-12">
+        <BackLink href="/dashboard" label="Back to dashboard" />
         <div className="mb-2 flex items-center justify-between">
           <h1 className="text-2xl font-semibold">{project.name}</h1>
           <span className="text-xs text-zinc-500">
@@ -77,24 +75,15 @@ export default async function ProjectPage({
 
         <p className="mb-8 text-sm text-zinc-500">
           Shareable link:{" "}
-          <code className="rounded bg-black/[.06] px-1.5 py-0.5 dark:bg-white/[.08]">
+          <a
+            href={`/projects/${project.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded bg-black/[.06] px-1.5 py-0.5 hover:underline dark:bg-white/[.08]"
+          >
             /projects/{project.slug}
-          </code>
+          </a>
         </p>
-
-        <div className="mb-8">
-          <CreateIssueForm slug={project.slug} />
-        </div>
-
-        {issues.length === 0 ? (
-          <p className="text-zinc-500">No issues yet.</p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {issues.map((issue) => (
-              <IssueCard key={issue.id} slug={project.slug} issue={issue} />
-            ))}
-          </div>
-        )}
       </main>
     </div>
   );
