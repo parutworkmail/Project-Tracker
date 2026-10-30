@@ -10,7 +10,7 @@ export default async function CreateUserPage() {
   const session = await auth();
 
   if (!session?.user?.id) {
-    redirect("/login");
+    redirect("/login?callbackUrl=%2Fadmin%2Fusers%2Fnew");
   }
 
   if (session.user.mustChangePassword) {

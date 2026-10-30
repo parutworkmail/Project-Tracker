@@ -24,6 +24,15 @@ function LoginForm() {
     searchParams.get("message")
   );
 
+  const rawCallbackUrl = searchParams.get("callbackUrl");
+  // Only allow same-origin relative paths (e.g. "/projecta/board") — never
+  // an absolute/external URL, which would be an open-redirect vulnerability
+  // if someone crafted a malicious ?callbackUrl= link.
+  const callbackUrl =
+    rawCallbackUrl && rawCallbackUrl.startsWith("/") && !rawCallbackUrl.startsWith("//")
+      ? rawCallbackUrl
+      : "/dashboard";
+
   const {
     register,
     handleSubmit,
@@ -61,7 +70,8 @@ function LoginForm() {
       return;
     }
 
-    router.push("/dashboard");
+    router.push(callbackUrl);
+    router.refresh();
   }
 
   return (

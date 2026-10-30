@@ -18,7 +18,6 @@ export function ProjectManageControls({
   name: string;
 }) {
   const router = useRouter();
-  const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,10 +48,10 @@ export function ProjectManageControls({
     }
 
     const updated = await res.json();
-    setIsEditing(false);
 
     if (updated.slug !== slug) {
       router.push(`/${updated.slug}/settings`);
+      router.refresh();
     } else {
       router.refresh();
     }
@@ -85,8 +84,8 @@ export function ProjectManageControls({
     router.refresh();
   }
 
-  if (isEditing) {
-    return (
+  return (
+    <div className="flex flex-col gap-3">
       <form onSubmit={handleSubmit(onSave)} className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
           <label htmlFor="project-name" className="text-xs font-medium">
@@ -135,35 +134,15 @@ export function ProjectManageControls({
           </button>
           <button
             type="button"
-            onClick={() => setIsEditing(false)}
-            className="rounded border border-black/[.08] px-2 py-1 text-xs dark:border-white/[.145]"
+            onClick={onDelete}
+            disabled={isDeleting}
+            className="rounded border border-red-600 px-2 py-1 text-xs text-red-600 disabled:opacity-50"
           >
-            Cancel
+            {isDeleting ? "Deleting..." : "Delete"}
           </button>
         </div>
         {error && <span className="text-xs text-red-600">{error}</span>}
       </form>
-    );
-  }
-
-  return (
-    <div className="flex items-center gap-2">
-      <button
-        type="button"
-        onClick={() => setIsEditing(true)}
-        className="rounded border border-black/[.08] px-2 py-1 text-xs dark:border-white/[.145]"
-      >
-        Edit
-      </button>
-      <button
-        type="button"
-        onClick={onDelete}
-        disabled={isDeleting}
-        className="rounded border border-red-600 px-2 py-1 text-xs text-red-600 disabled:opacity-50"
-      >
-        {isDeleting ? "Deleting..." : "Delete"}
-      </button>
-      {error && <span className="text-xs text-red-600">{error}</span>}
     </div>
   );
 }

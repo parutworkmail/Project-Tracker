@@ -128,7 +128,7 @@ export function ProjectAdminManager({
                 )}
               </div>
 
-              {assignable.length > 0 && (
+              {assignable.length > 0 ? (
                 <div className="flex items-center gap-2">
                   <select
                     value={selected[project.slug] ?? ""}
@@ -158,6 +158,12 @@ export function ProjectAdminManager({
                     Assign
                   </button>
                 </div>
+              ) : (
+                <p className="text-xs text-zinc-500">
+                  No more ADMIN-role users available to assign. Create a new
+                  user with the ADMIN role (or change an existing user&apos;s
+                  role to ADMIN) above to add another admin to this project.
+                </p>
               )}
             </div>
           );

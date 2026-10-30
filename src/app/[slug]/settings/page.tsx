@@ -15,16 +15,15 @@ export default async function ProjectSettingsPage({
   params: Promise<{ slug: string }>;
 }) {
   const session = await auth();
+  const { slug } = await params;
 
   if (!session?.user?.id) {
-    redirect("/login");
+    redirect(`/login?callbackUrl=${encodeURIComponent(`/${slug}/settings`)}`);
   }
 
   if (session.user.mustChangePassword) {
     redirect("/change-password");
   }
-
-  const { slug } = await params;
 
   const project = await prisma.project.findUnique({
     where: { slug },

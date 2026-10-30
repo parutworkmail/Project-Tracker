@@ -4,6 +4,7 @@ import { isReservedSlug } from "@/lib/slug";
 
 export const createProjectSchema = z.object({
   name: z.string().min(1, "Project name is required.").max(80),
+  memberIds: z.array(z.string()).optional(),
 });
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;

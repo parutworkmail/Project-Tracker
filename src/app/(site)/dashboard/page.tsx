@@ -1,13 +1,20 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { CreateProjectForm } from "@/components/create-project-form";
+import { CreateProjectDialog } from "@/components/create-project-dialog";
+import { ProjectListSection } from "@/components/project-list-section";
+import { ProjectSearchInput } from "@/components/project-search-input";
 
 export const instant = false;
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; page?: string }>;
+}) {
   const session = await auth();
 
   if (!session?.user?.id) {
@@ -20,9 +27,17 @@ export default async function DashboardPage() {
 
   const isSuperAdmin = session.user.role === "SUPER_ADMIN";
 
-  const projects = isSuperAdmin
-    ? await prisma.project.findMany({ orderBy: { createdAt: "desc" } })
-    : await mergeMemberAndManagedProjects(session.user.id, session.user.role);
+  const { q, page: pageParam } = await searchParams;
+  const query = (q ?? "").trim();
+  const page = Math.max(1, Number(pageParam) || 1);
+
+  const availableUsers = isSuperAdmin
+    ? await prisma.user.findMany({
+        where: { id: { not: session.user.id } },
+        orderBy: { username: "asc" },
+        select: { id: true, username: true, name: true },
+      })
+    : [];
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
@@ -41,56 +56,25 @@ export default async function DashboardPage() {
 
         {isSuperAdmin && (
           <div className="mb-8">
-            <CreateProjectForm />
+            <CreateProjectDialog availableUsers={availableUsers} />
           </div>
         )}
 
-        {projects.length === 0 ? (
-          <p className="text-zinc-500">
-            No projects yet.{" "}
-            {isSuperAdmin
-              ? "Create one above to get started."
-              : "Ask a super admin to create one, or join via a shared link."}
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {projects.map((project) => (
-              <li key={project.id}>
-                <Link
-                  href={`/${project.slug}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-between rounded border border-black/[.08] bg-white px-4 py-3 hover:bg-black/[.02] dark:border-white/[.145] dark:bg-black dark:hover:bg-white/[.04]"
-                >
-                  <span className="font-medium">{project.name}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+        <ProjectSearchInput initialQuery={query} />
+
+        <Suspense
+          key={`${query}:${page}`}
+          fallback={<p className="text-zinc-500">Searching…</p>}
+        >
+          <ProjectListSection
+            isSuperAdmin={isSuperAdmin}
+            userId={session.user.id}
+            role={session.user.role}
+            query={query}
+            page={page}
+          />
+        </Suspense>
       </main>
     </div>
   );
-}
-
-async function mergeMemberAndManagedProjects(userId: string, role: string) {
-  const [memberships, managed] = await Promise.all([
-    prisma.projectMember.findMany({
-      where: { userId },
-      include: { project: true },
-      orderBy: { createdAt: "desc" },
-    }),
-    role === "ADMIN"
-      ? prisma.project.findMany({
-          where: { admins: { some: { userId } } },
-          orderBy: { createdAt: "desc" },
-        })
-      : Promise.resolve([]),
-  ]);
-
-  const memberProjects = memberships.map((m) => m.project);
-  const seen = new Set(memberProjects.map((p) => p.id));
-  const extra = managed.filter((p) => !seen.has(p.id));
-
-  return [...memberProjects, ...extra];
 }

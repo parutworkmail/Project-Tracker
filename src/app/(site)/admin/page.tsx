@@ -13,7 +13,7 @@ export default async function AdminPage() {
   const session = await auth();
 
   if (!session?.user?.id) {
-    redirect("/login");
+    redirect("/login?callbackUrl=%2Fadmin");
   }
 
   if (session.user.mustChangePassword) {

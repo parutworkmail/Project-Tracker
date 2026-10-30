@@ -6,13 +6,183 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
+- **Plan**: New day. User wants yesterday's accumulated, logged-but-
+  uncommitted work validated end to end: `npx tsc --noEmit` + `npm run
+  lint` + full `npm test` + `npm run build`. If all pass, commit and
+  push. Covers: login callbackUrl/stale-cache fix, multi-admin-per-
+  project display fix, always-editable settings inputs, create-project
+  dialog + member assignment, dashboard search/pagination, `/api/
+  projects` GET/create split, Suspense-scoped dashboard loading fix.
+- **Status**: in progress.
+
+- **Plan**: User reported the "Searching…" indicator from the previous
+  task never actually appears, even with the isPending state confirmed
+  true in devtools. Root cause found: `dashboard/page.tsx`'s data fetch
+  (search/pagination query) was NOT wrapped in its own `<Suspense>` —
+  so navigating to a new `?q=` made Next.js swap the ENTIRE page out
+  for the route-level `dashboard/loading.tsx` fallback (destroying
+  `ProjectSearchInput`'s mounted state, including any pending indicator,
+  before it could ever be seen), then remount a fresh copy once data
+  arrived. Exact same bug class already fixed once before on the
+  project board page via `IssueBoardSection` — applying that same
+  pattern here. Plan: extract the data-dependent part into a new async
+  `ProjectListSection` Server Component, wrap ONLY that in `<Suspense
+  key={query+page}>` inside the page (the `key` forces a visible
+  fallback swap instead of silently keeping stale content); keep
+  `ProjectSearchInput` and the header outside the boundary so they
+  never unmount. Simplified `ProjectSearchInput` back down (no longer
+  needs the manual pending-tracking hack — the Suspense fallback now
+  provides the visible "Searching…" state correctly). tsc-only while
+  developing.
+- **Status**: done. New `src/components/project-list-section.tsx` (async
+  Server Component, holds both `getSuperAdminProjectsPage`/
+  `getMemberAndManagedProjectsPage` moved from the page file + renders
+  `ProjectList`). `src/app/(site)/dashboard/page.tsx` now fetches only
+  `availableUsers` (for the create dialog, independent of search/page)
+  directly, then wraps `<ProjectListSection>` in `<Suspense
+  key={`${query}:${page}`} fallback={<p>Searching…</p>}>` — changing
+  the search query or page now visibly swaps ONLY the list area to
+  "Searching…" while the input, header, and create-project button stay
+  mounted and interactive. `npx tsc --noEmit` + `npx eslint` on all
+  touched files clean. Re-verified against the user's running dev
+  server — `/dashboard` still correctly 307s to `/login` with no
+  session, confirming the restructure didn't break anything.
+- **Next**: none — task complete. Not committed yet. Full validation
+  sweep (lint/full test suite/build) + commit/push only when the user
+  asks.
+
+- **Plan**: User asked two things: (1) `/api/projects` naming is unclear
+  for what it does — split it so the create action has its own
+  self-describing path; (2) checked architecture per user's request:
+  SUPER_ADMIN's dashboard query (`prisma.project.findMany` with NO
+  limit) is a real unbounded-growth risk — confirmed there's no cap
+  today, so a large install would load every project row into memory
+  and ship it all to the browser just to filter client-side. Plan: (a)
+  move project creation to a dedicated `POST /api/projects/create`
+  (new route file), leave `GET /api/projects` as the listing endpoint
+  (that naming is already correct — GET on a collection = list); (b)
+  replace the client-side-filter `ProjectList` with real backend
+  search + pagination: dashboard page reads `?q=` and `?page=` from
+  `searchParams`, SUPER_ADMIN path does a real SQL `where: { name:
+  contains }` + `skip`/`take` + a `count()` for page info; the
+  member/admin-merge path still fetches its own bounded candidate set
+  (a single user's own project count isn't the unbounded case) and
+  filters/paginates that in JS — documented as a deliberate, scoped
+  decision, not an oversight. New debounced search-input client
+  component pushes `?q=` into the URL (full page is still server-
+  rendered per keystroke-debounce, not a separate fetch). tsc-only
+  while developing.
+- **Status**: done. (1) New `src/app/api/projects/create/route.ts` holds
+  the moved `POST` creation handler (rate limit, validation, member
+  dedup/existence-check, schema provisioning, project create — logic
+  unchanged, just relocated); `src/app/api/projects/route.ts` now only
+  exports `GET` (list the caller's own projects). Updated
+  `create-project-dialog.tsx`'s fetch target. Split
+  `route.test.ts` accordingly into `route.test.ts` (2 GET tests) +
+  `create/route.test.ts` (8 POST tests) — 10/10 passing, same coverage.
+  (2) Real backend search + pagination on `/dashboard`
+  (`src/app/(site)/dashboard/page.tsx` now reads `searchParams.q`/
+  `.page`): SUPER_ADMIN path (`getSuperAdminProjectsPage`) does a real
+  `prisma.project.findMany({ where: { name: { contains, insensitive } },
+  skip, take })` + `prisma.project.count()` — only one page of rows
+  (`PAGE_SIZE = 20`) is EVER fetched for that unbounded system-wide
+  case, never the full table. Member/admin-merge path
+  (`getMemberAndManagedProjectsPage`) keeps fetching its own bounded
+  per-user candidate set (not the unbounded case) and filters/
+  paginates that in memory — commented in the code as a deliberate
+  scoped choice. New `src/components/project-search-input.tsx` (client,
+  300ms-debounced, pushes `?q=` into the URL — full server round trip
+  per debounced keystroke, not a separate client fetch). Rewrote
+  `src/components/project-list.tsx` into a pure presentational list +
+  Prev/Next page links (no more client-side array filtering — the
+  array it receives is already the correct page from the server).
+  `npx next typegen` + `npx tsc --noEmit` clean, full `npm test` →
+  **213/213 passing** across 22 files (2 more files than before, from
+  the route-test split).
+- **Next**: none — task complete. Not committed yet. Full validation
+  sweep (lint/build) + commit/push only when the user asks.
+
+- **Plan**: User wants two dashboard changes: (1) move project creation
+  off the inline form into a dialog/popup (button opens it) that also
+  lets the creator assign people (members) to the new project at
+  creation time, not just the name; (2) add a search box on the
+  dashboard to filter the project list by name. Plan: new generic
+  `Dialog` component (plain overlay, no external lib — none installed),
+  new `CreateProjectDialog` (replaces inline `CreateProjectForm` on the
+  dashboard) with name input + checkbox list of users to add as
+  members, extend `createProjectSchema`/`POST /api/projects` to accept
+  optional `memberIds`, new client `ProjectList` wrapper (search input
+  + client-side filter over the already-fetched project array — no
+  extra network round trip needed, list is small). tsc-only while
+  developing.
+- **Status**: done. New `src/components/dialog.tsx` — plain reusable
+  overlay (backdrop click / Escape / ✕ to close, `role="dialog"`), no
+  external dependency since none were installed. New
+  `src/components/create-project-dialog.tsx` replaces the old inline
+  `CreateProjectForm` (deleted, zero remaining references) on
+  `/dashboard`: a "+ New project" button opens the dialog with a name
+  input + a scrollable checkbox list of every OTHER existing user to
+  assign as members at creation time. New `src/components/project-
+  list.tsx` — client wrapper taking the already-fetched project array +
+  a search input, filters client-side by name (no extra network call;
+  list size doesn't justify server-side search). `src/app/(site)/
+  dashboard/page.tsx` now fetches the full user list (SUPER_ADMIN only,
+  excluding self) alongside projects in the same `Promise.all`, passed
+  into the dialog. `createProjectSchema` gained optional `memberIds:
+  string[]`; `POST /api/projects` dedupes/excludes the creator's own id
+  from that list, then does a `prisma.user.findMany` existence check and
+  silently drops any id that isn't a real user (defends against a raw
+  FK-violation 500 if a stale/tampered id were ever submitted) before
+  creating all member rows (creator + valid extras) in one `create: [...]`
+  array. Updated `route.test.ts`'s existing create test (now expects an
+  array, not a single object) + added 2 new tests (valid-extra-members
+  path, invalid-id-silently-dropped path) → 10/10 passing in that file.
+  `npx tsc --noEmit` clean.
+- **Next**: none — task complete. Not committed yet. Full validation
+  sweep (lint/full test suite/build) + commit/push only when the user
+  asks.
+
+- **Plan**: User found a real bug: locked out `adminp1` via repeated wrong
+  passwords, then switched the login form to a different account
+  ("admin") with the correct password — login appeared to succeed (nav
+  showed logged-in state) but the screen stayed stuck on `/login`.
+  Reproduced server-side via a direct API test (created 2 disposable
+  test users, locked one via 5 wrong passwords, logged into the other
+  correctly, checked `/api/auth/session`) — confirmed the actual
+  NextAuth login/session flow is correct end to end, login genuinely
+  succeeds. Root cause isolated to a real gap: `/login` never checks
+  for an existing session (no middleware, no guard in the page) — if
+  the client's explicit `router.push("/dashboard")` ever lags/stalls
+  after the session cookie is already set (slow round-trip, React
+  timing), the Nav (independent `useSession` poll) flips to
+  authenticated instantly while the page content has nothing telling it
+  to leave `/login`. Fix: (1) convert `src/app/(site)/login/page.tsx`'s
+  default export to an async Server Component that calls `auth()` first
+  and redirects already-authenticated users away (to `/change-password`
+  or `/dashboard`) before ever rendering the form — same pattern already
+  used on every other protected page; (2) add a client-side safety net
+  in `LoginForm` (`useEffect` watching `useSession()` status) that also
+  redirects if session becomes authenticated while still mounted, as a
+  second line of defense against the exact timing race described.
+  Cleaned up both disposable test users from the real DB after the
+  repro. tsc-only while developing.
+- **Status**: in progress.
+
 - **Plan**: User wants to wrap up the day: run full validation (tsc +
   lint + full test suite + build), and if everything passes, commit and
   push all of today's work (route restructure to `/{slug}` + `/{slug}/
   board` + `/{slug}/settings`, `(site)` route-group nav isolation,
   `ProjectNav`/member management/issue-delete features, board loading
   fix).
-- **Status**: in progress.
+- **Status**: done. Full sweep all green: `npx tsc --noEmit` clean,
+  `npm run lint` clean (same 2 pre-existing unrelated warnings only),
+  `npm test` → 211/211 passing, `npm run build` succeeds with the
+  correct full route list (`/[slug]`, `/[slug]/board`,
+  `/[slug]/settings`, new `/api/projects/[slug]/members[/...]`, all
+  `(site)` pages). Committed `f5ce004` (30 files, git correctly detected
+  the route-group/board-split renames) and pushed to `origin/main` —
+  user explicitly asked to push.
+- **Next**: none — day's work complete and shipped.
 
 - **Plan**: User reported the whole screen (including nav) shows a
   generic "Loading..." on `/{slug}/board`, when only the task table
