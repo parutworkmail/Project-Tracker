@@ -1,8 +1,12 @@
+import { ProjectListSkeleton } from "@/components/project-list-skeleton";
+
 export default function Loading() {
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-12">
-        <p className="text-zinc-500">Loading...</p>
+    <div className="flex flex-1 flex-col">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
+        <div className="skeleton mb-8 h-44 w-full rounded-3xl" />
+        <div className="skeleton mb-6 h-12 w-full rounded-xl" />
+        <ProjectListSkeleton />
       </main>
     </div>
   );

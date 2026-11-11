@@ -67,7 +67,7 @@ export function CreateUserForm() {
           autoComplete="off"
           placeholder="Username"
           {...register("username")}
-          className="rounded border border-black/[.08] px-3 py-2 dark:border-white/[.145] dark:bg-black"
+          className="rounded border border-black/[.08] px-3 py-2 dark:border-white/[.145] dark:bg-surface"
         />
         {errors.username && (
           <p role="alert" className="text-sm text-red-600">
@@ -85,7 +85,7 @@ export function CreateUserForm() {
           type="text"
           placeholder="Full name"
           {...register("name")}
-          className="rounded border border-black/[.08] px-3 py-2 dark:border-white/[.145] dark:bg-black"
+          className="rounded border border-black/[.08] px-3 py-2 dark:border-white/[.145] dark:bg-surface"
         />
       </div>
 
@@ -99,7 +99,7 @@ export function CreateUserForm() {
           autoComplete="off"
           placeholder="Email"
           {...register("email")}
-          className="rounded border border-black/[.08] px-3 py-2 dark:border-white/[.145] dark:bg-black"
+          className="rounded border border-black/[.08] px-3 py-2 dark:border-white/[.145] dark:bg-surface"
         />
         {errors.email && (
           <p role="alert" className="text-sm text-red-600">
@@ -115,7 +115,7 @@ export function CreateUserForm() {
         <select
           id="new-user-role"
           {...register("role")}
-          className="rounded border border-black/[.08] bg-white px-3 py-2 dark:border-white/[.145] dark:bg-black"
+          className="rounded border border-black/[.08] bg-surface px-3 py-2 dark:border-white/[.145]"
         >
           {ROLES.map((role) => (
             <option key={role} value={role}>
@@ -134,7 +134,7 @@ export function CreateUserForm() {
           autoComplete="new-password"
           placeholder="Temporary password"
           {...register("password")}
-          className="rounded border border-black/[.08] py-2 pl-3 dark:border-white/[.145] dark:bg-black"
+          className="rounded border border-black/[.08] py-2 pl-3 dark:border-white/[.145] dark:bg-surface"
         />
         {errors.password && (
           <p role="alert" className="text-sm text-red-600">
@@ -155,7 +155,7 @@ export function CreateUserForm() {
           autoComplete="new-password"
           placeholder="Confirm temporary password"
           {...register("confirmPassword")}
-          className="rounded border border-black/[.08] py-2 pl-3 dark:border-white/[.145] dark:bg-black"
+          className="rounded border border-black/[.08] py-2 pl-3 dark:border-white/[.145] dark:bg-surface"
         />
         {errors.confirmPassword && (
           <p role="alert" className="text-sm text-red-600">

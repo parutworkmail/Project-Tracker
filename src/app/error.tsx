@@ -14,7 +14,7 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 bg-zinc-50 px-6 text-center dark:bg-black">
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 bg-zinc-50 px-6 text-center dark:bg-surface">
       <h2 className="text-xl font-semibold">Something went wrong.</h2>
       <p className="text-sm text-zinc-500">
         An unexpected error occurred. Try again, or go back home.

@@ -51,7 +51,7 @@ export default async function ProjectSettingsPage({
   }
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
+    <div className="flex flex-1 flex-col">
       <ProjectNav
         slug={project.slug}
         name={project.name}
@@ -71,6 +71,7 @@ export default async function ProjectSettingsPage({
           <h2 className="mb-3 text-sm font-medium text-zinc-500">Members</h2>
           <ProjectMemberManager
             slug={project.slug}
+            currentUserId={session.user.id}
             members={project.members.map((m) => ({
               id: m.user.id,
               username: m.user.username,

@@ -37,15 +37,57 @@ export const addProjectMemberSchema = z.object({
 
 export type AddProjectMemberInput = z.infer<typeof addProjectMemberSchema>;
 
+const ISSUE_STATUSES = ["todo", "in_progress", "done"] as const;
+const ISSUE_PRIORITIES = ["low", "medium", "high", "urgent"] as const;
+
+const dueDateField = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Use the format YYYY-MM-DD.")
+  .refine((value) => {
+    const date = new Date(`${value}T00:00:00Z`);
+    return (
+      !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+    );
+  }, "That is not a valid date.");
+
 export const createIssueSchema = z.object({
-  title: z.string().min(1, "Title is required.").max(200),
-  description: z.string().max(2000).optional().or(z.literal("")),
+  title: z.string().trim().min(1, "Title is required.").max(200),
+  description: z.string().max(2000).nullable().optional().or(z.literal("")),
+  priority: z.enum(ISSUE_PRIORITIES).optional(),
+  dueDate: dueDateField.nullable().optional().or(z.literal("")),
+  assigneeId: z.string().nullable().optional(),
 });
 
 export type CreateIssueInput = z.infer<typeof createIssueSchema>;
 
 export const updateIssueStatusSchema = z.object({
-  status: z.enum(["todo", "in_progress", "done"]),
+  status: z.enum(ISSUE_STATUSES),
 });
 
 export type UpdateIssueStatusInput = z.infer<typeof updateIssueStatusSchema>;
+
+export const updateIssueSchema = z
+  .object({
+    title: z.string().trim().min(1, "Title is required.").max(200).optional(),
+    description: z.string().max(2000).nullable().optional(),
+    status: z.enum(ISSUE_STATUSES).optional(),
+    priority: z.enum(ISSUE_PRIORITIES).optional(),
+    dueDate: dueDateField.nullable().optional().or(z.literal("")),
+    assigneeId: z.string().nullable().optional(),
+  })
+  .refine((data) => Object.values(data).some((value) => value !== undefined), {
+    message: "At least one field is required.",
+  });
+
+export type UpdateIssueInput = z.infer<typeof updateIssueSchema>;
+
+export const createCommentSchema = z.object({
+  body: z
+    .string()
+    .trim()
+    .min(1, "Comment cannot be empty.")
+    .max(2000, "Comment is too long."),
+});
+
+export type CreateCommentInput = z.infer<typeof createCommentSchema>;
+

@@ -77,7 +77,7 @@ export function CreateProjectDialog({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded bg-foreground px-4 py-2 text-sm text-background"
+        className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-on-accent shadow-lg shadow-black/20 hover:-translate-y-0.5 hover:brightness-105"
       >
         + New project
       </button>
@@ -93,7 +93,7 @@ export function CreateProjectDialog({
               type="text"
               placeholder="New project name"
               {...register("name")}
-              className="rounded border border-black/[.08] px-3 py-2 dark:border-white/[.145] dark:bg-black"
+              className="rounded border border-black/[.08] px-3 py-2 dark:border-white/[.145] dark:bg-surface"
             />
             {errors.name && (
               <p className="text-sm text-red-600">{errors.name.message}</p>

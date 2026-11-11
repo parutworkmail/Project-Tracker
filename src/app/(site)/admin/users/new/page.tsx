@@ -22,7 +22,7 @@ export default async function CreateUserPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
+    <div className="flex flex-1 flex-col">
       <main className="mx-auto w-full max-w-sm flex-1 px-6 py-12">
         <BackLink href="/admin" label="Back to admin console" />
         <h1 className="mb-6 text-2xl font-semibold">Create user</h1>

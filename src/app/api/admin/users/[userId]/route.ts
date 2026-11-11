@@ -4,8 +4,9 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { isSuperAdmin } from "@/lib/permissions";
-import { updateUserRoleSchema } from "@/lib/validation/admin";
+import { updateUserSchema } from "@/lib/validation/admin";
 import { withApiErrorHandling } from "@/lib/apiError";
+import { enforceRateLimit, HOUR } from "@/lib/enforceRateLimit";
 
 async function handlePATCH(
   request: Request,
@@ -17,25 +18,43 @@ async function handlePATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const limited = await enforceRateLimit({
+    scope: "admin-update-user",
+    subject: session.user.id,
+    limit: 100,
+    windowMs: HOUR,
+    message: "Too many user updates. Please try again later.",
+  });
+
+  if (limited) {
+    return limited;
+  }
+
   if (!isSuperAdmin(session.user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { userId } = await params;
 
-  if (userId === session.user.id) {
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const parsed = updateUserSchema.safeParse(raw);
+
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: "You cannot change your own role." },
+      { error: parsed.error.issues[0]?.message ?? "Invalid input." },
       { status: 400 }
     );
   }
 
-  const body = await request.json();
-  const parsed = updateUserRoleSchema.safeParse(body);
-
-  if (!parsed.success) {
+  if (parsed.data.role !== undefined && userId === session.user.id) {
     return NextResponse.json(
-      { error: parsed.error.flatten() },
+      { error: "You cannot change your own role." },
       { status: 400 }
     );
   }
@@ -46,17 +65,39 @@ async function handlePATCH(
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const updated = await prisma.user.update({
-    where: { id: userId },
-    data: { role: parsed.data.role },
-  });
+  const data: Prisma.UserUpdateInput = {};
+  if (parsed.data.username !== undefined) data.username = parsed.data.username;
+  if (parsed.data.name !== undefined) data.name = parsed.data.name;
+  if (parsed.data.email !== undefined) data.email = parsed.data.email;
+  if (parsed.data.role !== undefined) data.role = parsed.data.role;
 
-  return NextResponse.json({
-    id: updated.id,
-    name: updated.name,
-    email: updated.email,
-    role: updated.role,
-  });
+  try {
+    const updated = await prisma.user.update({ where: { id: userId }, data });
+
+    return NextResponse.json({
+      id: updated.id,
+      username: updated.username,
+      name: updated.name,
+      email: updated.email,
+      role: updated.role,
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const target = Array.isArray(error.meta?.target)
+        ? (error.meta?.target as string[]).join(", ")
+        : "username or email";
+
+      return NextResponse.json(
+        { error: `A user with this ${target} already exists.` },
+        { status: 409 }
+      );
+    }
+
+    throw error;
+  }
 }
 
 async function handleDELETE(

@@ -14,8 +14,8 @@ export default async function ChangePasswordPage() {
   }
 
   return (
-    <div className="flex flex-1 items-center justify-center bg-zinc-50 dark:bg-black">
-      <div className="w-full max-w-sm rounded-lg border border-black/[.08] bg-white p-8 dark:border-white/[.145] dark:bg-black">
+    <div className="flex flex-1 items-center justify-center">
+      <div className="w-full max-w-sm rounded-lg border border-black/[.08] bg-surface p-8 dark:border-white/[.145]">
         {!session.user.mustChangePassword && (
           <BackLink href="/dashboard" label="Back to dashboard" />
         )}

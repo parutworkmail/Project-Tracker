@@ -9,6 +9,16 @@ const { authMock, userFindUnique, userUpdate, userDelete } = vi.hoisted(() => ({
 
 vi.mock("@/auth", () => ({ auth: authMock }));
 
+const { enforceRateLimit } = vi.hoisted(() => ({
+  enforceRateLimit: vi.fn(),
+}));
+
+vi.mock("@/lib/enforceRateLimit", () => ({
+  enforceRateLimit,
+  MINUTE: 60000,
+  HOUR: 3600000,
+}));
+
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: { findUnique: userFindUnique, update: userUpdate, delete: userDelete },
@@ -18,6 +28,11 @@ vi.mock("@/lib/prisma", () => ({
 
 import { Prisma } from "@/generated/prisma/client";
 import { PATCH, DELETE } from "./route";
+
+beforeEach(() => {
+  enforceRateLimit.mockReset();
+  enforceRateLimit.mockResolvedValue(null);
+});
 
 function jsonRequest(body: unknown) {
   return new Request("http://localhost/api/admin/users/x", {
@@ -120,6 +135,83 @@ describe("PATCH /api/admin/users/[userId]", () => {
       where: { id: "user-2" },
       data: { role: "ADMIN" },
     });
+  });
+});
+
+describe("PATCH profile fields /api/admin/users/[userId]", () => {
+  beforeEach(() => {
+    authMock.mockReset();
+    userFindUnique.mockReset();
+    userUpdate.mockReset();
+    authMock.mockResolvedValue({ user: { id: "super-1", role: "SUPER_ADMIN" } });
+    userFindUnique.mockResolvedValue({ id: "user-2" });
+  });
+
+  it("updates username, name and email together and returns the username", async () => {
+    userUpdate.mockResolvedValue({
+      id: "user-2",
+      username: "bob2",
+      name: "Bob",
+      email: "bob@example.com",
+      role: "USER",
+    });
+
+    const response = await PATCH(
+      jsonRequest({ username: " bob2 ", name: " Bob ", email: "bob@example.com" }),
+      params("user-2")
+    );
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).username).toBe("bob2");
+    expect(userUpdate).toHaveBeenCalledWith({
+      where: { id: "user-2" },
+      data: { username: "bob2", name: "Bob", email: "bob@example.com" },
+    });
+  });
+
+  it("clears name and email when sent empty or null", async () => {
+    userUpdate.mockResolvedValue({ id: "user-2" });
+
+    await PATCH(jsonRequest({ name: "", email: null }), params("user-2"));
+
+    expect(userUpdate).toHaveBeenCalledWith({
+      where: { id: "user-2" },
+      data: { name: null, email: null },
+    });
+  });
+
+  it("lets a super admin edit their own profile but not their own role", async () => {
+    userUpdate.mockResolvedValue({ id: "super-1" });
+
+    const profile = await PATCH(jsonRequest({ name: "Me" }), params("super-1"));
+    const role = await PATCH(jsonRequest({ role: "USER" }), params("super-1"));
+
+    expect(profile.status).toBe(200);
+    expect(role.status).toBe(400);
+  });
+
+  it("rejects an invalid username, a bad email and an empty body", async () => {
+    for (const body of [{ username: "a" }, { username: "bad name!" }, { email: "nope" }, {}]) {
+      const response = await PATCH(jsonRequest(body), params("user-2"));
+      expect(response.status).toBe(400);
+    }
+    expect(userUpdate).not.toHaveBeenCalled();
+  });
+
+  it("returns 409 when the username or email is already taken", async () => {
+    userUpdate.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("dup", {
+        code: "P2002",
+        clientVersion: "test",
+        meta: { target: ["username"] },
+      })
+    );
+
+    const response = await PATCH(jsonRequest({ username: "taken" }), params("user-2"));
+    const body = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(body.error).toContain("username");
   });
 });
 

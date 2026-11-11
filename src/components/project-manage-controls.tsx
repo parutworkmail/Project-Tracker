@@ -95,7 +95,7 @@ export function ProjectManageControls({
             id="project-name"
             type="text"
             {...register("name")}
-            className="rounded border border-black/[.08] px-2 py-1 text-sm dark:border-white/[.145] dark:bg-black"
+            className="rounded border border-black/[.08] px-2 py-1 text-sm dark:border-white/[.145] dark:bg-surface"
           />
           {errors.name && (
             <span className="text-xs text-red-600">
@@ -114,7 +114,7 @@ export function ProjectManageControls({
               id="project-slug"
               type="text"
               {...register("slug")}
-              className="rounded border border-black/[.08] px-2 py-1 text-sm dark:border-white/[.145] dark:bg-black"
+              className="rounded border border-black/[.08] px-2 py-1 text-sm dark:border-white/[.145] dark:bg-surface"
             />
           </div>
           {errors.slug && (

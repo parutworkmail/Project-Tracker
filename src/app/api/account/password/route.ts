@@ -5,12 +5,25 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { changePasswordSchema } from "@/lib/validation/auth";
 import { withApiErrorHandling } from "@/lib/apiError";
+import { enforceRateLimit, MINUTE } from "@/lib/enforceRateLimit";
 
 async function handlePATCH(request: Request) {
   const session = await auth();
 
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const limited = await enforceRateLimit({
+    scope: "password-change",
+    subject: session.user.id,
+    limit: 10,
+    windowMs: 15 * MINUTE,
+    message: "Too many password change attempts. Please try again later.",
+  });
+
+  if (limited) {
+    return limited;
   }
 
   let body: unknown;

@@ -4,8 +4,9 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { createIssue, listIssues } from "@/lib/projectSchema";
 import { createIssueSchema } from "@/lib/validation/project";
-import { canAccessProject } from "@/lib/permissions";
+import { canAccessProject, isAssignableUser } from "@/lib/permissions";
 import { withApiErrorHandling } from "@/lib/apiError";
+import { enforceRateLimit, MINUTE } from "@/lib/enforceRateLimit";
 
 async function getMembership(slug: string, userId: string) {
   const project = await prisma.project.findUnique({
@@ -63,6 +64,18 @@ async function handlePOST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const limited = await enforceRateLimit({
+    scope: "issue-create",
+    subject: session.user.id,
+    limit: 60,
+    windowMs: MINUTE,
+    message: "You are creating tasks too quickly. Please wait a moment.",
+  });
+
+  if (limited) {
+    return limited;
+  }
+
   const { slug } = await params;
   const { project, membership } = await getMembership(slug, session.user.id);
 
@@ -81,12 +94,27 @@ async function handlePOST(
     return NextResponse.json({ error: "Not a member" }, { status: 403 });
   }
 
-  const body = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
   const parsed = createIssueSchema.safeParse(body);
 
   if (!parsed.success) {
     return NextResponse.json(
-      { error: parsed.error.flatten() },
+      { error: parsed.error.issues[0]?.message ?? "Invalid request" },
+      { status: 400 }
+    );
+  }
+
+  const assigneeId = parsed.data.assigneeId || null;
+
+  if (assigneeId && !(await isAssignableUser(project.id, assigneeId))) {
+    return NextResponse.json(
+      { error: "Assignee must be a member of this project." },
       { status: 400 }
     );
   }
@@ -95,6 +123,9 @@ async function handlePOST(
     title: parsed.data.title,
     description: parsed.data.description || null,
     createdBy: session.user.id,
+    priority: parsed.data.priority,
+    dueDate: parsed.data.dueDate || null,
+    assigneeId,
   });
 
   return NextResponse.json(issue, { status: 201 });

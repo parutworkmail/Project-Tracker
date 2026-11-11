@@ -59,7 +59,7 @@ export function ChangePasswordForm({
           autoComplete="new-password"
           placeholder="New password"
           {...register("newPassword")}
-          className="rounded border border-black/[.08] py-2 pl-3 dark:border-white/[.145] dark:bg-black"
+          className="rounded border border-black/[.08] py-2 pl-3 dark:border-white/[.145] dark:bg-surface"
         />
         {errors.newPassword && (
           <p role="alert" className="text-sm text-red-600">
@@ -80,7 +80,7 @@ export function ChangePasswordForm({
           autoComplete="new-password"
           placeholder="Confirm new password"
           {...register("confirmPassword")}
-          className="rounded border border-black/[.08] py-2 pl-3 dark:border-white/[.145] dark:bg-black"
+          className="rounded border border-black/[.08] py-2 pl-3 dark:border-white/[.145] dark:bg-surface"
         />
         {errors.confirmPassword && (
           <p role="alert" className="text-sm text-red-600">

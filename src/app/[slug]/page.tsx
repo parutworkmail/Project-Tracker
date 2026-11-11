@@ -45,7 +45,7 @@ export default async function ProjectEntryPage({
 
   if (!membership && !canManage) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 dark:bg-black">
+      <div className="flex flex-1 flex-col items-center justify-center">
         <BackLink href="/dashboard" label="Back to dashboard" />
         <h1 className="mb-6 text-2xl font-semibold">{project.name}</h1>
         <JoinProjectButton slug={project.slug} />

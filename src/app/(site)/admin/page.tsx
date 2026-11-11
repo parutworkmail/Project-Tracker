@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { UserRoleManager } from "@/components/admin/user-role-manager";
 import { ProjectAdminManager } from "@/components/admin/project-admin-manager";
 import { BackLink } from "@/components/back-link";
+import { AssignmentHistory } from "@/components/admin/assignment-history";
 
 export const instant = false;
 
@@ -24,7 +25,7 @@ export default async function AdminPage() {
     redirect("/dashboard");
   }
 
-  const [users, projects] = await Promise.all([
+  const [users, projects, assignments] = await Promise.all([
     prisma.user.findMany({
       orderBy: { createdAt: "asc" },
       select: { id: true, username: true, name: true, email: true, role: true },
@@ -40,13 +41,22 @@ export default async function AdminPage() {
         _count: { select: { members: true } },
       },
     }),
+    prisma.projectAdmin.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      include: {
+        project: { select: { name: true, slug: true } },
+        user: { select: { username: true, name: true } },
+        assignedBy: { select: { username: true } },
+      },
+    }),
   ]);
 
   const admins = users.filter((u) => u.role === "ADMIN");
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12">
+    <div className="flex flex-1 flex-col">
+      <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-12">
         <BackLink href="/dashboard" label="Back to dashboard" />
         <h1 className="mb-8 text-2xl font-semibold">Admin console</h1>
 
@@ -66,7 +76,7 @@ export default async function AdminPage() {
           />
         </section>
 
-        <section>
+        <section className="mb-12">
           <h2 className="mb-4 text-lg font-medium">Projects</h2>
           <ProjectAdminManager
             projects={projects.map((p) => ({
@@ -82,6 +92,26 @@ export default async function AdminPage() {
               })),
             }))}
             availableAdmins={admins}
+          />
+        </section>
+
+        <section>
+          <h2 className="mb-1 text-lg font-medium">Admin assignment history</h2>
+          <p className="mb-4 text-sm text-zinc-500">
+            Who was made admin of which project, and by whom. Showing the latest
+            50.
+          </p>
+          <AssignmentHistory
+            rows={assignments.map((a) => ({
+              id: a.id,
+              projectName: a.project.name,
+              projectSlug: a.project.slug,
+              adminLabel: a.user.name
+                ? `${a.user.name} (${a.user.username})`
+                : a.user.username,
+              assignedBy: a.assignedBy?.username ?? null,
+              assignedAt: a.createdAt.toISOString(),
+            }))}
           />
         </section>
       </main>

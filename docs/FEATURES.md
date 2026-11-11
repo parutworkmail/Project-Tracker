@@ -1,6 +1,6 @@
 # Project Tracker — Feature & Capability Overview
 
-A JIRA-like, multi-tenant project/issue tracker. Each project gets its own
+A JIRA-like, multi-tenant project/task tracker. Each project gets its own
 isolated Postgres schema. Access is entirely admin-provisioned — there is
 no public signup.
 
@@ -52,10 +52,14 @@ link, and becomes a "member" of that project.
 | Rename / delete a project | ✅ (any) | ✅ (that project only) | ❌ | ❌ |
 | View / access a project without joining | ✅ | ✅ (that project only) | ❌ | ❌ |
 | Join a project via its link | ✅ | ✅ | ✅ | ✅ |
-| Create / view issues (once a member, or with manage access) | ✅ | ✅ | ✅ (if a member) | ✅ (if a member) |
-| Update an issue's status | ✅ | ✅ | ✅ (if a member) | ✅ (if a member) |
+| Create / view / edit issues, assign them, comment (once a member, or with manage access) | ✅ | ✅ | ✅ (if a member) | ✅ (if a member) |
+| Delete an issue | ✅ | ✅ (that project only) | ❌ | ❌ |
+| Delete a comment | ✅ (any) | ✅ (any, that project) | own only | own only |
+| Leave a project | ✅ | ✅ | ✅ | ✅ |
+| Add / remove other members | ✅ | ✅ (that project only) | ❌ | ❌ |
 | Open the Admin console | ✅ | ❌ | ❌ | ❌ |
 | Create / delete user accounts | ✅ | ❌ | ❌ | ❌ |
+| Edit a user's username / name / email, reset their password | ✅ | ❌ | ❌ | ❌ |
 | Change another user's global role | ✅ | ❌ | ❌ | ❌ |
 | Assign/unassign project admins | ✅ | ❌ | ❌ | ❌ |
 
@@ -84,52 +88,66 @@ removed or reassigned.
   every page in the app show a clear "database unavailable" message
   instead of a blank or broken screen.
 
-**Not available today:** self-service signup, "forgot password" /
-password-reset-by-email, two-factor authentication, logging in with
-Google or any other external account, and no way for an admin to look up
-or reset a forgotten password (they can only change the *role*, or delete
-and recreate the account).
+- A SUPER_ADMIN can **reset another user's password** to a new temporary
+  one. The user is forced to choose their own at next sign-in, and any
+  lockout is cleared. Passwords are never shown to anyone after being set.
+- A SUPER_ADMIN can edit a user's username, name and email after creation.
+
+**Not available today:** self-service signup, "forgot password" by
+email, two-factor authentication, and logging in with Google or any other
+external account.
 
 ---
 
 ## 3. Projects
 
-- Only a **SUPER_ADMIN** can create a new project. On creation, the
-  project gets its own fully isolated area of the database — nothing
-  about one project's issues is ever stored together with another's.
-- Every project has a **shareable link**. Anyone who is logged in and has
-  that link can join instantly — there is no approval step and no way to
-  make a project "private" today.
-- The project creator (always a SUPER_ADMIN) and any SUPER_ADMIN can
-  rename or permanently delete the project at any time. A SUPER_ADMIN can
-  also hand day-to-day management of a specific project to an ADMIN,
-  without giving that ADMIN control over anything else in the system.
+- Only a **SUPER_ADMIN** can create a new project (optionally adding
+  members at creation). On creation, the project gets its own fully
+  isolated area of the database — nothing about one project's tasks is ever
+  stored together with another's.
+- Every project has a **shareable link** (`/{slug}`) and opens in its own
+  tab with its own navigation. Anyone who is logged in and has the link can
+  join instantly — there is no approval step and no way to make a project
+  "private" today.
+- A SUPER_ADMIN, or an ADMIN assigned to the project, can rename it, change
+  its link, add or remove members and delete it. Reserved words (such as
+  `login` or `admin`) cannot be used as a link.
+- **Members can leave** a project themselves. Whether they leave or are
+  removed by a manager, their tasks become unassigned (nothing is lost).
+- The dashboard lists the projects you belong to (or all projects for a
+  SUPER_ADMIN) with search and pagination.
 - Deleting a project is **permanent and immediate** — it removes the
-  project and every issue in it; there is no "trash"/recovery step.
+  project and every task and comment in it; there is no "trash"/recovery.
 
-**Not available today:** leaving a project you've joined, removing a
-regular member from a project (only *admin assignments* can be removed,
-not plain membership), transferring who "owns" a project, archiving a
-project instead of deleting it, and searching or filtering the project
-list.
+**Not available today:** transferring who "owns" a project, archiving a
+project instead of deleting it, and private/invite-only projects.
 
 ---
 
 ## 4. Issue Tracking
 
-Each issue has a **title**, an optional **description**, and a **status**
-— exactly one of `To Do`, `In Progress`, or `Done`.
+Each task has a **title**, optional **description**, a **status** (`To do`,
+`In progress`, `Done`), a **priority** (`Low`, `Medium`, `High`, `Urgent`),
+an optional **due date** and an optional **assignee**.
 
-- Any member of a project (or an admin with access to it) can create an
-  issue and move it through the 3 statuses.
-- Issues are listed newest-first, with no pagination — the whole list
-  loads at once.
+- Any member of a project (or an admin with access to it) can create a
+  task, change any of its fields on the task page, and change its status
+  quickly from the board.
+- Tasks can only be assigned to people who are members of (or admins
+  assigned to) that project.
+- Every task has a **comment thread**. Comments can be deleted by their
+  author or by a project manager.
+- The board supports **search** (title and description), **filters**
+  (status, priority, assignee, unassigned), **sorting** (newest, oldest,
+  recently updated, priority, due date) and **pagination** (25 per page).
+- Overdue tasks (past their due date and not Done) are highlighted.
+- Only project managers can delete a task.
+- Projects created before these features existed upgrade automatically the
+  first time they are opened — no manual migration is needed.
 
-**Not available today:** editing an issue's title/description after
-creation (only the status can change), deleting an issue, assigning an
-issue to a specific teammate, comments/discussion on an issue, file
-attachments, priority levels, due dates, and search/filter/sort on the
-issue list.
+**Not available today:** file attachments, labels/tags, sub-tasks,
+task history/activity log, @mentions and notifications, bulk edits, and a
+kanban (drag and drop) view.
 
 ---
 
@@ -139,36 +157,45 @@ Visible only to SUPER_ADMIN accounts, at `/admin`.
 
 **User management:**
 - View every account (username, name, email, role).
+- Create a new account with a temporary password, optional name/email and
+  a starting role.
+- **Edit** a user's username, name and email.
+- **Reset** a user's password (temporary password, forced change at next
+  sign-in, lockout cleared).
 - Change any other user's role (not your own).
 - Delete any other user's account (not your own; blocked if they still
   own a project).
-- Create a new account with a temp password, optional name/email, and a
-  starting role.
 
 **Project oversight:**
-- View every project with its member count and currently assigned
-  admins.
+- View every project with its member count and currently assigned admins.
 - Assign a user (who must already hold the ADMIN role) to manage a
   specific project, or remove that assignment.
+- **Assignment history**: who was made admin of which project, by whom and
+  when (latest 50).
 
-**Not available today from the console:** editing a user's
-username/name/email after creation, resetting another user's password
-for them, bulk actions (bulk delete, bulk role change, CSV import),
-creating/renaming/deleting a project (project edits happen on the
-project's own page, not here), and an audit trail view (the system does
-record *who* assigned each project admin internally, but there is no
-screen to see that history yet).
+**Not available today from the console:** bulk actions (bulk delete, bulk
+role change, CSV import) and a full audit log of every action (only admin
+assignments are recorded).
 
 ---
 
-## 6. Reliability & Error Handling
+## 6. Security, Reliability & Experience
 
+- **Brute-force and abuse protection:** login attempts, project creation,
+  joining, task creation and edits, comments, password changes, adding
+  members and the admin actions (create/edit user, reset password) are all
+  rate limited. Limits are stored in the database, so they hold across
+  serverless instances.
+- **Security headers** are sent on every response (content security
+  policy, clickjacking protection, MIME sniffing protection, strict
+  transport security in production, referrer and permissions policies).
 - If the database connection drops or is misconfigured, the app detects
   this specifically and shows a clear, honest message (both on the login
   screen and as a banner across the app) instead of a generic crash page.
-- Rate limits are enforced on login, project creation, and joining a
-  project, to slow down automated abuse. Issue creation/updates, password
-  changes, and admin actions are not currently rate-limited.
+- **Light, dark and system themes**, switchable from the header; the choice
+  is remembered on the device.
+- Forms show clear error messages, dialogs close with Escape, and controls
+  have accessible labels for screen readers.
 
 ---
 
@@ -177,16 +204,12 @@ screen to see that history yet).
 For quick reference, the most notable things this application **does not
 do today**:
 
-- No public signup, password reset, 2FA, or social login.
-- No way to leave a project or remove a regular member from one.
-- No project ownership transfer or archiving (delete is permanent).
-- No issue editing, deletion, assignment, comments, attachments,
-  priorities, or due dates.
-- No search, filtering, or pagination anywhere in the app.
-- No notifications (email or in-app) of any kind.
-- No audit log screen, bulk admin actions, or CSP/security headers
-  configuration.
-- No dark/light mode toggle (it follows the device's OS setting only).
+- No public signup, email-based password reset, 2FA, or social login.
+- No private/invite-only projects, project ownership transfer or archiving
+  (delete is permanent).
+- No attachments, labels, sub-tasks, activity history, notifications or
+  drag-and-drop board.
+- No bulk admin actions or full audit log.
 
 None of these are bugs — they're simply scope that hasn't been built yet.
 See `PROGRESS.md` for what's actively being worked on.

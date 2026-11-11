@@ -1,15 +1,32 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authMock, projectFindUnique, listIssues, createIssue, canAccessProject } =
-  vi.hoisted(() => ({
-    authMock: vi.fn(),
-    projectFindUnique: vi.fn(),
-    listIssues: vi.fn(),
-    createIssue: vi.fn(),
-    canAccessProject: vi.fn(),
-  }));
+const {
+  authMock,
+  projectFindUnique,
+  listIssues,
+  createIssue,
+  canAccessProject,
+  isAssignableUser,
+} = vi.hoisted(() => ({
+  authMock: vi.fn(),
+  projectFindUnique: vi.fn(),
+  listIssues: vi.fn(),
+  createIssue: vi.fn(),
+  canAccessProject: vi.fn(),
+  isAssignableUser: vi.fn(),
+}));
 
 vi.mock("@/auth", () => ({ auth: authMock }));
+
+const { enforceRateLimit } = vi.hoisted(() => ({
+  enforceRateLimit: vi.fn(),
+}));
+
+vi.mock("@/lib/enforceRateLimit", () => ({
+  enforceRateLimit,
+  MINUTE: 60000,
+  HOUR: 3600000,
+}));
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -25,9 +42,15 @@ vi.mock("@/lib/projectSchema", () => ({
 
 vi.mock("@/lib/permissions", () => ({
   canAccessProject,
+  isAssignableUser,
 }));
 
 import { GET, POST } from "./route";
+
+beforeEach(() => {
+  enforceRateLimit.mockReset();
+  enforceRateLimit.mockResolvedValue(null);
+});
 
 function params(slug: string) {
   return { params: Promise.resolve({ slug }) };
@@ -60,7 +83,7 @@ describe("GET /api/projects/[slug]/issues", () => {
     expect(response.status).toBe(401);
   });
 
-  it("returns 404 when the project doesn't exist", async () => {
+  it("returns 404 when the project does not exist", async () => {
     authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
     projectFindUnique.mockResolvedValue(null);
 
@@ -80,7 +103,7 @@ describe("GET /api/projects/[slug]/issues", () => {
     expect(listIssues).not.toHaveBeenCalled();
   });
 
-  it("lists issues scoped to the project's schema for a member", async () => {
+  it("lists issues scoped to the project schema for a member", async () => {
     authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
     projectFindUnique.mockResolvedValue(project);
     canAccessProject.mockResolvedValue(true);
@@ -118,6 +141,7 @@ describe("POST /api/projects/[slug]/issues", () => {
     projectFindUnique.mockReset();
     createIssue.mockReset();
     canAccessProject.mockReset();
+    isAssignableUser.mockReset();
   });
 
   it("returns 401 when there is no session", async () => {
@@ -150,7 +174,7 @@ describe("POST /api/projects/[slug]/issues", () => {
     expect(createIssue).not.toHaveBeenCalled();
   });
 
-  it("creates the issue scoped to the project's schema, attributed to the caller", async () => {
+  it("creates the issue scoped to the project schema, attributed to the caller", async () => {
     authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
     projectFindUnique.mockResolvedValue(project);
     canAccessProject.mockResolvedValue(true);
@@ -168,6 +192,9 @@ describe("POST /api/projects/[slug]/issues", () => {
       title: "Bug",
       description: "Steps to repro",
       createdBy: "user-1",
+      priority: undefined,
+      dueDate: null,
+      assigneeId: null,
     });
   });
 
@@ -183,6 +210,73 @@ describe("POST /api/projects/[slug]/issues", () => {
       title: "Bug",
       description: null,
       createdBy: "user-1",
+      priority: undefined,
+      dueDate: null,
+      assigneeId: null,
     });
   });
+
+  it("passes priority, due date and a valid assignee through", async () => {
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
+    projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(true);
+    isAssignableUser.mockResolvedValue(true);
+    createIssue.mockResolvedValue({ id: "i1" });
+
+    const response = await POST(
+      jsonRequest({
+        title: "Bug",
+        priority: "urgent",
+        dueDate: "2027-03-01",
+        assigneeId: "user-2",
+      }),
+      params("x")
+    );
+
+    expect(response.status).toBe(201);
+    expect(isAssignableUser).toHaveBeenCalledWith("p1", "user-2");
+    expect(createIssue).toHaveBeenCalledWith("proj_abc", {
+      title: "Bug",
+      description: null,
+      createdBy: "user-1",
+      priority: "urgent",
+      dueDate: "2027-03-01",
+      assigneeId: "user-2",
+    });
+  });
+
+  it("rejects an assignee who is not part of the project", async () => {
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
+    projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(true);
+    isAssignableUser.mockResolvedValue(false);
+
+    const response = await POST(
+      jsonRequest({ title: "Bug", assigneeId: "stranger" }),
+      params("x")
+    );
+
+    expect(response.status).toBe(400);
+    expect(createIssue).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid priority and an impossible due date", async () => {
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
+    projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(true);
+
+    const badPriority = await POST(
+      jsonRequest({ title: "Bug", priority: "asap" }),
+      params("x")
+    );
+    const badDate = await POST(
+      jsonRequest({ title: "Bug", dueDate: "2027-02-31" }),
+      params("x")
+    );
+
+    expect(badPriority.status).toBe(400);
+    expect(badDate.status).toBe(400);
+    expect(createIssue).not.toHaveBeenCalled();
+  });
 });
+

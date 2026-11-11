@@ -92,7 +92,7 @@ export function ProjectAdminManager({
           return (
             <div
               key={project.id}
-              className="rounded border border-black/[.08] bg-white p-4 dark:border-white/[.145] dark:bg-black"
+              className="rounded border border-black/[.08] bg-surface p-4 dark:border-white/[.145]"
             >
               <div className="mb-2 flex items-center justify-between">
                 <span className="font-medium">{project.name}</span>
@@ -138,7 +138,7 @@ export function ProjectAdminManager({
                         [project.slug]: e.target.value,
                       }))
                     }
-                    className="rounded border border-black/[.08] bg-white px-2 py-1 text-sm dark:border-white/[.145] dark:bg-black"
+                    className="rounded border border-black/[.08] bg-surface px-2 py-1 text-sm dark:border-white/[.145]"
                   >
                     <option value="">Select an admin…</option>
                     {assignable.map((admin) => (

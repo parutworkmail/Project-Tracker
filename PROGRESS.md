@@ -6,14 +6,323 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
-- **Plan**: New day. User wants yesterday's accumulated, logged-but-
+- **Plan**: User approved today's work and said "commit and push" (this
+  message). Run the full validation tier (tsc + lint + full tests + build),
+  commit everything, push ONCE. Then user goes AFK 1-2 h and wants an
+  autonomous loop: research a feature -> develop -> test -> repeat until
+  stopped manually. Ask scope/safety questions first.
+- **Status**: full validation GREEN on final code (tsc clean, eslint 0
+  errors, 317 unit tests pass / 6 skipped, `npm run build` OK). Committing
+  and pushing once (user asked in this message). Answers for the AFK loop:
+  Supabase MAY be used (only additive, backward-compatible migrations,
+  tested on local DB first - the live Vercel site shares that DB); commit
+  each finished feature locally, NEVER push without a new explicit ask;
+  scope = product features only (no new npm dependencies, keep current
+  look, never remove existing features).
+
+- **Plan**: User feedback on first page (home `/`, logged out): (1) show
+  "Log in" + "Join us" instead of "Go to dashboard" when not signed in
+  (signed-in keeps "Go to dashboard"); Log in -> /login, Join us -> new
+  /join page saying "Please contact your project admin, or contact John
+  Doe"; (2) remove the "Plan, track and ship together" chip; (3) Log in is
+  always the primary (amber) button, Join us a clearly styled secondary
+  (not plain white); same in the nav. Add "join" to RESERVED_SLUGS. tsc +
+  eslint + screenshot only.
+- **Status**: done (not committed). New `components/hero-actions.tsx`
+  (client; signed-out = Log in primary + Join us secondary, signed-in = Go
+  to dashboard), chip removed from `(site)/page.tsx`, new `(site)/join/
+  page.tsx`, nav shows Join us + primary Log in when signed out, new
+  `.btn-secondary` in globals.css (follow-up: user said Join us looked too
+  large/loud -> now transparent, muted text, 1px inset-shadow outline so it
+  is exactly the same size as the primary, weight 500, subtle hover; checked
+  with light+dark screenshots),
+  `join` reserved slug. tsc + eslint + slug tests clean; dev server serves
+  `/` and `/join` with the new content. No visual screenshot taken.
+- **Next**: wait for user feedback in FEEDBACK.md.
+
+- **Plan**: User says the amber accent is too dark/brownish, especially on
+  buttons — wants a brighter yellowish tone. Change the accent tokens to a
+  sunny yellow (~#FFC93C) with navy text on it, remove every brown-looking
+  amber-600/800/900 shade, and stop using gold as TEXT colour on light
+  backgrounds (use navy text on a yellow tint instead). Screenshots + tsc +
+  eslint only.
+- **Status**: in progress.
+
+- **Plan**: User rejected the new theme: hates purple, grey and "extreme"
+  colour (barbie world / black-white funeral) — wants a workspace feel.
+  User picked "Warm neutral + amber": warm paper-like background, deep
+  navy ink, small amber accent. Replace every purple/violet/fuchsia/
+  indigo/pink use (tokens in globals.css + hard-coded Tailwind classes
+  across components, avatar gradients, summary mesh), tone gradients/glow/
+  orbs way down, keep animations and layout. Light + dark both. Checks:
+  tsc + eslint + screenshots only (user said no full suite).
+- **Status**: in progress.
+
+- **Plan**: User feedback: the dashboard is "super boring, plain html" —
+  wants a much more modern look with better styling and animation, and an
+  updated theme. Scope: new design system in globals.css (tokens, gradient
+  accent, glass sticky headers, card/button/input utilities, entrance +
+  hover animations, shimmer skeletons, reduced-motion support), redesigned
+  /dashboard (greeting hero, project cards grid with gradient avatars,
+  member count + role chip, nicer search + empty state + skeleton), and the
+  same theme applied to Nav, ProjectNav, home, login, board, dialogs.
+  Also: the Nav "database unavailable" banner should heal itself (poll
+  until the DB is back). Keep every string/behaviour the tests and E2E rely
+  on. Checks: tsc + eslint + screenshots only (user said no full suite).
+- **Status**: in progress. (Connection self-healing from the previous
+  request is DONE: 5 s connect timeout + 1 automatic retry in
+  `src/lib/retryingPool.ts`, used by `src/lib/prisma.ts`; 10 unit tests
+  pass; simulated silent hang gave up at 10.35 s after exactly 2 attempts;
+  dev server restarted, keep-alive 200 against Supabase.)
+- **Status (redesign, DONE, not committed)**: new design system in
+  `src/app/globals.css` (indigo/violet/fuchsia tokens, gradient-mesh body
+  background, `.glass`, `.surface`, `.card-lift`, `.skeleton`,
+  `.gradient-text`, `.hero-gradient`, keyframes fade-up/fade-in/pop/float/
+  shimmer/gradient-pan, reduced-motion support, global gradient primary
+  buttons + focus-ring inputs). Bulk-migrated 31 files from flat
+  `bg-zinc-50/dark:bg-black` to the new surfaces. Redesigned: /dashboard
+  (gradient hero with floating orbs, stat tiles, project cards with
+  gradient avatars + role chip + member count + created date, search with
+  icon, empty state, shimmer skeleton), Nav + ProjectNav (sticky glass,
+  logo mark, avatar chip), home (hero + feature cards), login (floating
+  card), Dialog (blur + pop), task table (surface card, row fade-in),
+  loading skeletons. New: `src/lib/avatar.ts`, `components/avatar.tsx`,
+  `components/project-list-skeleton.tsx`. Nav DB banner now self-heals
+  (re-checks session every 8 s while the DB is down). Verified: tsc clean,
+  eslint clean, prod build OK, real-Chrome screenshots (light+dark) of
+  home, login, dashboard, board, create dialog on a LOCAL test Postgres
+  (not Supabase; deleted afterwards). Full unit/E2E suites NOT re-run
+  (user said skip) — only styling/props changed, but ProjectListSection
+  now returns card data (memberCount/isManager/createdAt).
+- **Not covered by screenshots**: task detail, settings, admin, change-
+  password pages only got the automatic surface/button/input restyle.
+- **Next**: wait for user feedback in FEEDBACK.md.
+
+- **Plan**: User chose "timeout + one retry" auto-recovery for the DB
+  connection. Add a 10 s connection timeout and ONE automatic retry that
+  only fires when the connection could not be established (so no query was
+  sent and a retry can never duplicate a write). Implement as a small Pool
+  subclass in `src/lib/retryingPool.ts` used by `src/lib/prisma.ts`, with a
+  unit test for the retry logic. Light checks only (tsc + that one test +
+  one live Supabase check); no full suite, per user.
+- **Status**: in progress.
+
+- **Plan**: User wants the Supabase connection problem fixed now: the
+  website cannot connect to the DB. Diagnose root cause on this machine
+  (direct host TLS handshake never completes; pooler resets), try fixes
+  (e.g. smaller TLS ClientHello / alternative route), and say exactly what
+  is needed from the user. No full test runs until DB connects (user's
+  instruction).
+- **Status**: root cause FOUND + fixed in code. Node 26 / OpenSSL 3.5 sends
+  a post-quantum hybrid key share (X25519MLKEM768) by default; the huge TLS
+  ClientHello is silently dropped on this network path, so the Postgres TLS
+  handshake to the (IPv6-only) Supabase direct host never completes. With
+  `ecdhCurve: "X25519:prime256v1:secp384r1"` it connects in ~1.4 s (verified:
+  real query on Supabase returned db=postgres, 6 users). Fix applied in
+  `src/lib/prisma.ts` (+ e2e/cleanup/visual scripts); tsc clean. Cleanup
+  script run on Supabase: removed the 1 leftover `e2e_member_*_x` test user
+  (remaining users: test1, admin, adminp1, test2, a2admin; projects:
+  project1, project2 — all the user's). User's `next dev` (port 3000, pid
+  24260) still has the OLD cached Prisma client -> needs a restart. Added
+  `scripts/db-trace.mjs` (TLS diagnosis).
+- **Next**: user's dev server restart; then the final Supabase E2E when the
+  user says go.
+- **Update**: user approved; I stopped the old `next dev` (pids 12876/
+  24260/29928) and started a fresh one (background shell 094, port 3000).
+  Verified through the app's own Prisma client: GET /api/cron/keep-alive
+  -> 200 {"ok":true} against Supabase. Site can reach the DB again.
+
+- **Plan**: User wants the way I produce the daily-summary infographic
+  saved as a SKILL so it is faster next time. Create a project skill
+  `daily-summary-infographic` (SKILL.md + reusable template.html), make
+  `scripts/render-html.mjs` find puppeteer/Chrome without hardcoded
+  paths, and point the CLAUDE.md rule at the skill.
+- **Status**: done. New project skill
+  `.axet-code/skills/daily-summary-infographic/` (SKILL.md with the 7-step
+  procedure + accuracy rules, template.html = the approved layout).
+  `scripts/render-html.mjs` now auto-finds puppeteer-core and Chrome/Edge
+  and falls back to `-v2.png` if the PNG is locked. New
+  `scripts/summary-facts.mjs [--checks]` prints verified git/tsc/lint/
+  vitest numbers (tested: 86 files changed, tsc+lint clean, 307 tests
+  passed / 6 skipped). CLAUDE.md summary rule now points at the skill.
+  Render test OK (932 KB PNG). Side effect: a test render overwrote the
+  old wrong-numbers `2026-11-11-summary.png` with the corrected content,
+  so both it and `-v2.png` now show correct data.
+- **Note**: the skill is only listed for the agent from the NEXT session;
+  CLAUDE.md already tells every session to use it.
+- **Next**: wait for user feedback in FEEDBACK.md.
+
+- **Plan**: User found the infographic data misleading: it said "Real-
+  database tests 6/6" although every DB test ran on the throwaway LOCAL
+  Postgres, not Supabase. Audit every number on the summary against facts
+  (git file count, review-agent count, findings fixed vs not), fix the
+  HTML, re-render, open it, and tighten the CLAUDE.md rule so each check
+  names the database it ran on.
+- **Status**: done. Corrected + re-rendered as
+  `docs/summaries/2026-11-11-summary-v2.png` (old PNG was locked by the
+  viewer; it still shows the WRONG numbers — ignore/delete it) and opened
+  for the user. Fixes: DB checks relabelled "LOCAL test DB" with a red
+  "Final code on YOUR Supabase: 0 - not tested" row + note that earlier
+  cloud runs (issues 32/32, members pass, admin 46/47) predated the final
+  code; files 84 (was ~70); review agents 2 (was 3); findings 26/31 fixed
+  with the 5 open ones listed (dialog focus trap/scroll lock, live region
+  + unsaved warning, GET /issues ignores search params). CLAUDE.md now has
+  accuracy rules for the summary.
+- **Next**: wait for user feedback in FEEDBACK.md.
+
+- **Plan**: User complained that I only generated the summary infographic
+  and did not open it for them. Open the PNG in their default viewer now,
+  and add "open the file for the user" to the CLAUDE.md summary rule.
+- **Status**: done. Opened `docs/summaries/2026-11-11-summary.png` with
+  Start-Process (exit 0); CLAUDE.md rule now says to open it every time.
+- **Next**: wait for user feedback in FEEDBACK.md.
+
+- **Plan**: User wants every "summarize today" request answered with an
+  infographic image (easier to read) instead of a text list. Build one for
+  today (2026-11-11), render it to PNG via headless Chrome, and record the
+  rule in CLAUDE.md.
+- **Status**: done. Infographic at `docs/summaries/2026-11-11-summary.png`
+  (source `.html` next to it), rendered by new `scripts/render-html.mjs`
+  (headless Chrome, hardcoded puppeteer cache path, machine-specific).
+  Rule "Daily summary = infographic" added to CLAUDE.md.
+- **Next**: wait for user feedback in FEEDBACK.md.
+
+- **Plan**: User handed over full control: build everything in docs/
+  FEATURES.md "known limitations" (scope confirmed: full gap list) from
+  0 to 100, with testing/verification and UX/UI polish. Work in
+  features, one at a time; user tests finished features and leaves
+  feedback in `FEEDBACK.md` (a queue file I re-read after every task and
+  fold into the next work). User pushes themselves — NEVER push. Roadmap:
+  (1) issue tracking: edit, assignee, priority, due date, comments,
+  search/filter/sort; (2) project members: leave/remove; (3) admin:
+  edit user, reset password, audit view; (4) security headers + rate
+  limits on remaining routes; (5) UX/UI: dark/light toggle + polish;
+  (6) docs rewrite (README/project.md/FEATURES.md). Sub-agents are
+  read-only → used as reviewers/validators only.
+- **Status**: Phase 1 (issue tracking) DONE and verified, not committed
+  (user pushes/commits). Delivered: per-project schema lazy upgrade
+  (`ensureProjectSchema`: priority, due_date, comments table; single-
+  flight + retry; legacy schemas upgrade on first use, verified against
+  the real DB), `searchIssues` (q/status/priority/assignee/sort/25-per-
+  page), `updateIssue` (title/description/status/priority/dueDate/
+  assignee, clear with ""/null), comments API (list/add, delete =
+  author or manager), assignee must be member/assigned admin, issue
+  detail page `/{slug}/board/{issueId}` (edit form + comments), board
+  rewrite (filters bar, badges, overdue highlight, pagination, create
+  dialog with priority/assignee/due date). Review by 2 read-only
+  sub-agents (backend + FE) → ~15 fixes applied. Verification:
+  `tsc` clean, `eslint src` clean, `npm run build` OK, `npm test` 276
+  passed (+6 real-DB integration tests, opt-in via RUN_DB_INTEGRATION=1),
+  `scripts/e2e-issues.mjs` against `next start` + real DB: 32/32 pass
+  (temp users/project cleaned up).
+- **Next**: Phase 2 — project members: leave project / remove member.
+
+- **Plan**: Phase 2 — project members. User wants: (a) any member can
+  leave a project; (b) managers can remove members (already exists via
+  DELETE members/[userId] + ProjectMemberManager — audit it); guardrails:
+  leaving must not strand issues silently (unassign the leaver's open
+  issues), and the project creator/last access should be handled sanely.
+  Add tests + review. tsc/targeted tests while developing.
+- **Status**: Phase 2 DONE and verified (not committed). Members can
+  leave (`LeaveProjectButton` on the board, DELETE members/[userId] allows
+  self without manage rights); managers can remove anyone; both
+  unassign the leaver's issues (`unassignUserIssues`); add-member route
+  hardened (bad JSON, string errors, trimmed username); member manager
+  UI got confirm dialogs, "you" badge, per-row pending, alerts. +13 unit
+  tests (289 pass), build OK, tsc/lint clean, E2E extended (all pass).
+- **Next**: Phase 3 — admin: edit user (name/email/username), admin reset
+  password (temp pw + forced change), audit view of project-admin
+  assignments.
+
+- **Plan**: Phase 3 — admin console extras: (1) edit a user's name/email/
+  username, (2) SUPER_ADMIN resets another user's password to a new temp
+  password (sets mustChangePassword, clears lockout), (3) audit view of
+  who assigned each project admin and when (data already stored).
+- **Status**: Phase 3 code DONE (not committed): PATCH /api/admin/users/
+  [userId] now edits username/name/email/role (self-role still blocked,
+  409 on duplicates), new POST .../reset-password (temp pw, forces change,
+  clears lockout, blocks self), admin UI Edit + Reset password dialogs,
+  "Admin assignment history" table. +15 unit tests (304 pass), tsc/lint/
+  build OK. E2E for these passed 46/47 before the Supabase DB started
+  resetting connections from this machine (ECONNRESET) — the last
+  failing check was a test-assertion bug (fixed); final full E2E re-run
+  still pending until DB is reachable. scripts/e2e-cleanup.mjs removes
+  any leftover e2e_* data.
+- **Next**: Phase 4 — security headers + rate limits on remaining routes.
+
+- **Plan**: Phase 4 — (a) security headers via next.config headers()
+  (nosniff, frame deny, referrer, permissions, HSTS, CSP compatible with
+  Next inline bootstrap), (b) `enforceRateLimit` helper applied to issue
+  create/update, comments, password change, admin reset-password/create
+  user, add member.
+- **Status**: Phase 4 code DONE (not committed): `enforceRateLimit`
+  wired into issue create/update, comments, password change, admin
+  create-user/reset-password/edit, add member; security headers in
+  `next.config.ts` (CSP w/o nonce because nonces force dynamic rendering
+  and would defeat PPR; nosniff, frame DENY, referrer, permissions, COOP,
+  HSTS prod-only, poweredBy off) — verified on `next start`: all headers
+  present on pages + API. tsc clean, 307 tests pass, build OK. Real-DB
+  E2E re-run BLOCKED: Supabase direct host times out/ECONNRESETs from this
+  machine right now (network, not code) — retry later; run
+  `node --env-file=.env scripts/e2e-cleanup.mjs` first to purge any
+  leftover e2e_* rows. Stale `next start` may still hold port 3100.
+- **Next**: Phase 5 — UX/UI: dark/light/system theme toggle (class-based),
+  nav polish, consistent buttons/inputs, empty/loading states.
+- **Status (Phase 5, partial)**: theme system DONE — class-based dark mode
+  (`@custom-variant dark` in globals.css), `ThemeToggle` (system/light/
+  dark cycle, persisted in localStorage, follows OS changes) in both the
+  site nav and project nav, no-flash init script in root layout. Verified
+  with real Chrome screenshots (light + dark emulation, `dark` class set
+  correctly) via `scripts/screenshot.mjs`. Authenticated pages (board,
+  task page, admin) NOT yet visually checked — needs DB (Supabase
+  unreachable from this machine at the moment). Screenshots in
+  `tmp-shots/` (delete when done).
+- **Status (Phase 6)**: docs DONE (not committed): README.md rewritten
+  (setup, env vars, scripts, structure), project.md updated (no more
+  signup/Google), docs/FEATURES.md sections 1-7 updated to the real
+  feature set, `.env.example` stale Google vars removed. Diagram PNGs in
+  docs/diagrams are NOT regenerated (still show the older use cases).
+- **Status (diagrams)**: 3 use-case diagrams + project-lifecycle flow
+  re-written and re-rendered to PNG (docs/diagrams). sequence-login
+  unchanged (still accurate). Docs workstream fully DONE.
+- **Status (final validation, DONE)**: Supabase stayed unreachable from this
+  machine (TCP + TLS accept, then the Postgres handshake gets no reply;
+  reproduced with a raw socket, no app code involved), so everything was
+  verified against a THROWAWAY local PostgreSQL 17 (`scripts/local-db.mjs`,
+  port 5544, private data dir, deleted afterwards; `src/lib/prisma.ts`
+  gained `SUPABASE_DB_SSL=disable` for it — default behaviour unchanged).
+  All 7 migrations apply cleanly on an empty DB. Results on the final
+  code: tsc clean, eslint clean, `npm run build` OK, 307 unit tests pass,
+  6/6 real-DB integration tests, E2E 55/55 (issues, comments, members,
+  admin edit/reset, lockout, forced change, pages, filters), no leftover
+  rows. Visual pass (real Chrome, light+dark) of dashboard, board,
+  filtered/empty board, task page, create dialog, settings, admin: fixed
+  due-date wrapping; everything else fine. Found + fixed an E2E script
+  leak (renamed test user not cleaned up).
+- **Open item**: Supabase (cloud) may still contain leftover `e2e_*` test
+  users from earlier cloud E2E runs (renamed user `e2e_member_*_x`).
+  Once the connection works from this machine run:
+  `node --env-file=.env scripts/e2e-cleanup.mjs`.
+- **Next**: wait for user feedback in FEEDBACK.md. Machine-specific helper
+  scripts (`screenshot.mjs`, `visual-pass.mjs`) hardcode a puppeteer cache
+  path — do not rely on them elsewhere.
+
+- **Plan**: (previous) New day. User wants yesterday's accumulated, logged-but-
   uncommitted work validated end to end: `npx tsc --noEmit` + `npm run
   lint` + full `npm test` + `npm run build`. If all pass, commit and
   push. Covers: login callbackUrl/stale-cache fix, multi-admin-per-
   project display fix, always-editable settings inputs, create-project
   dialog + member assignment, dashboard search/pagination, `/api/
   projects` GET/create split, Suspense-scoped dashboard loading fix.
-- **Status**: in progress.
+- **Status**: done. Full sweep: `npx tsc --noEmit` clean, `npm run lint`
+  caught one real error (`project-admin-manager.tsx` — unescaped `'` in
+  JSX text, `react/no-unescaped-entities`), fixed → clean (same 2
+  pre-existing unrelated warnings only), `npm test` → 213/213 passing,
+  `npm run build` succeeds with the correct full route list including
+  the new `/api/projects/create`. Committed `e8e2a42` (21 files) and
+  pushed to `origin/main` — user explicitly asked to push.
+- **Next**: none — yesterday's backlog fully shipped. Ready for new
+  feature work.
 
 - **Plan**: User reported the "Searching…" indicator from the previous
   task never actually appears, even with the isPending state confirmed

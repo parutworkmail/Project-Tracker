@@ -51,10 +51,14 @@ describe("schema name validation guard", () => {
 
     await provisionProjectSchema(schemaName);
 
-    expect(executeRawUnsafe).toHaveBeenCalledTimes(2);
-    expect(executeRawUnsafe.mock.calls[0][0]).toContain("CREATE SCHEMA");
-    expect(executeRawUnsafe.mock.calls[0][0]).toContain(schemaName);
-    expect(executeRawUnsafe.mock.calls[1][0]).toContain("CREATE TABLE");
+    const statements = executeRawUnsafe.mock.calls.map((call) => call[0] as string);
+
+    expect(statements[0]).toContain("CREATE SCHEMA");
+    expect(statements[0]).toContain(schemaName);
+    expect(statements.some((sql) => sql.includes("CREATE TABLE IF NOT EXISTS") && sql.includes(".\"issues\""))).toBe(true);
+    expect(statements.some((sql) => sql.includes("ADD COLUMN IF NOT EXISTS priority"))).toBe(true);
+    expect(statements.some((sql) => sql.includes("ADD COLUMN IF NOT EXISTS due_date"))).toBe(true);
+    expect(statements.some((sql) => sql.includes(".\"comments\""))).toBe(true);
   });
 
   it("dropProjectSchema rejects an invalid schema name without touching the DB", async () => {
@@ -88,9 +92,9 @@ describe("schema name validation guard", () => {
 
     await listIssues(schemaName);
 
-    expect(queryRawUnsafe).toHaveBeenCalledTimes(1);
-    expect(queryRawUnsafe.mock.calls[0][0]).toContain(schemaName);
-    expect(queryRawUnsafe.mock.calls[0][0]).toContain("ORDER BY created_at DESC");
+    const lastSql = queryRawUnsafe.mock.calls.at(-1)?.[0] as string;
+    expect(lastSql).toContain(schemaName);
+    expect(lastSql).toContain("ORDER BY created_at DESC");
   });
 
   it("createIssue rejects an invalid schema name without touching the DB", async () => {
@@ -117,7 +121,10 @@ describe("schema name validation guard", () => {
       expect.any(String),
       "Fix bug",
       "Details",
-      "user-1"
+      "user-1",
+      "medium",
+      null,
+      null
     );
   });
 
@@ -132,7 +139,10 @@ describe("schema name validation guard", () => {
       expect.any(String),
       "No desc",
       null,
-      "user-1"
+      "user-1",
+      "medium",
+      null,
+      null
     );
   });
 

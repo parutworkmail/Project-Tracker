@@ -2,10 +2,15 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { updateIssueStatus, deleteIssue } from "@/lib/projectSchema";
-import { updateIssueStatusSchema } from "@/lib/validation/project";
-import { canAccessProject, canManageProject } from "@/lib/permissions";
+import { updateIssue, deleteIssue } from "@/lib/projectSchema";
+import { updateIssueSchema } from "@/lib/validation/project";
+import {
+  canAccessProject,
+  canManageProject,
+  isAssignableUser,
+} from "@/lib/permissions";
 import { withApiErrorHandling } from "@/lib/apiError";
+import { enforceRateLimit, MINUTE } from "@/lib/enforceRateLimit";
 
 async function handlePATCH(
   request: Request,
@@ -15,6 +20,18 @@ async function handlePATCH(
 
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const limited = await enforceRateLimit({
+    scope: "issue-update",
+    subject: session.user.id,
+    limit: 120,
+    windowMs: MINUTE,
+    message: "You are updating tasks too quickly. Please wait a moment.",
+  });
+
+  if (limited) {
+    return limited;
   }
 
   const { slug, issueId } = await params;
@@ -43,21 +60,50 @@ async function handlePATCH(
     return NextResponse.json({ error: "Not a member" }, { status: 403 });
   }
 
-  const body = await request.json();
-  const parsed = updateIssueStatusSchema.safeParse(body);
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const parsed = updateIssueSchema.safeParse(body);
 
   if (!parsed.success) {
     return NextResponse.json(
-      { error: parsed.error.flatten() },
+      { error: parsed.error.issues[0]?.message ?? "Invalid request" },
       { status: 400 }
     );
   }
 
-  const issue = await updateIssueStatus(
-    project.schemaName,
-    issueId,
-    parsed.data.status
-  );
+  const { title, description, status, priority, dueDate, assigneeId } =
+    parsed.data;
+
+  const normalizedAssignee =
+    assigneeId === undefined ? undefined : assigneeId || null;
+
+  if (
+    normalizedAssignee &&
+    !(await isAssignableUser(project.id, normalizedAssignee))
+  ) {
+    return NextResponse.json(
+      { error: "Assignee must be a member of this project." },
+      { status: 400 }
+    );
+  }
+
+  const issue = await updateIssue(project.schemaName, issueId, {
+    title,
+    description: description === undefined ? undefined : description || null,
+    status,
+    priority,
+    dueDate: dueDate === undefined ? undefined : dueDate || null,
+    assigneeId: normalizedAssignee,
+  });
+
+  if (!issue) {
+    return NextResponse.json({ error: "Issue not found" }, { status: 404 });
+  }
 
   return NextResponse.json(issue);
 }

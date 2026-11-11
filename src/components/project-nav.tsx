@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 
+import { Avatar } from "@/components/avatar";
+import { ThemeToggle } from "@/components/theme-toggle";
+
 export function ProjectNav({
   slug,
   name,
@@ -15,42 +18,59 @@ export function ProjectNav({
   canManage: boolean;
 }) {
   const { data: session, status } = useSession();
+  const username = session?.user?.username ?? "";
 
   return (
-    <header className="mb-6 flex items-center justify-between border-b border-black/[.08] px-6 py-3 dark:border-white/[.145]">
+    <header className="glass sticky top-0 z-40 mb-6 flex items-center justify-between border-b border-black/[.06] px-6 py-3 dark:border-white/[.08]">
       <Link
         href={`/${slug}/board`}
-        className={
-          active === "board"
-            ? "text-2xl font-semibold underline"
-            : "text-2xl font-semibold hover:underline"
-        }
+        className="group flex min-w-0 items-center gap-3"
       >
-        {name}
+        <Avatar name={name} seed={slug} size={38} />
+        <span
+          className={
+            active === "board"
+              ? "gradient-text truncate text-xl font-semibold tracking-tight"
+              : "truncate text-xl font-semibold tracking-tight group-hover:text-foreground dark:group-hover:text-accent-text"
+          }
+        >
+          {name}
+        </span>
       </Link>
 
-      <div className="flex items-center gap-4 text-sm">
+      <div className="flex items-center gap-2 text-sm">
+        <ThemeToggle />
         {canManage && (
           <Link
             href={`/${slug}/settings`}
             className={
               active === "settings"
-                ? "font-medium underline"
-                : "text-zinc-500 hover:underline"
+                ? "rounded-lg bg-accent/45 px-3 py-1.5 font-medium text-foreground dark:bg-accent/20 dark:text-accent-text"
+                : "rounded-lg px-3 py-1.5 text-muted hover:bg-accent/12 hover:text-foreground"
             }
           >
             Settings
           </Link>
         )}
-        <Link href="/dashboard" className="text-zinc-500 hover:underline">
+        <Link
+          href="/dashboard"
+          className="rounded-lg px-3 py-1.5 text-muted hover:bg-accent/12 hover:text-foreground"
+        >
           Dashboard
         </Link>
         {status === "authenticated" && (
           <>
-            <span className="text-zinc-500">{session.user?.username}</span>
+            <span className="ml-1 flex items-center gap-2 rounded-full border border-black/[.06] py-1 pl-1 pr-3 dark:border-white/[.1]">
+              <Avatar
+                name={username || "?"}
+                size={26}
+                rounded="rounded-full"
+              />
+              <span className="text-muted">{username}</span>
+            </span>
             <button
               onClick={() => signOut({ callbackUrl: "/" })}
-              className="rounded border border-black/[.08] px-3 py-1 dark:border-white/[.145]"
+              className="rounded-lg border border-black/[.08] px-3 py-1.5 dark:border-white/[.145]"
             >
               Sign out
             </button>

@@ -7,6 +7,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { isSuperAdmin } from "@/lib/permissions";
 import { createUserSchema } from "@/lib/validation/admin";
 import { withApiErrorHandling } from "@/lib/apiError";
+import { enforceRateLimit, HOUR } from "@/lib/enforceRateLimit";
 
 async function handleGET() {
   const session = await auth();
@@ -39,6 +40,18 @@ async function handlePOST(request: Request) {
 
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const limited = await enforceRateLimit({
+    scope: "admin-create-user",
+    subject: session.user.id,
+    limit: 30,
+    windowMs: HOUR,
+    message: "Too many users created. Please try again later.",
+  });
+
+  if (limited) {
+    return limited;
   }
 
   if (!isSuperAdmin(session.user.role)) {

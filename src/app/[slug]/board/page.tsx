@@ -3,7 +3,10 @@ import { Suspense } from "react";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { canManageProject } from "@/lib/permissions";
+import { canManageProject, getAssignableUsers } from "@/lib/permissions";
+import { buildBoardQuery, parseIssueFilters } from "@/lib/issueFilters";
+import { IssueFilters } from "@/components/issue-filters";
+import { LeaveProjectButton } from "@/components/leave-project-button";
 import { JoinProjectButton } from "@/components/join-project-button";
 import { CreateIssueButton } from "@/components/create-issue-button";
 import { IssueBoardSection } from "@/components/issue-board-section";
@@ -14,11 +17,14 @@ export const instant = false;
 
 export default async function ProjectBoardPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const session = await auth();
   const { slug } = await params;
+  const filters = parseIssueFilters(await searchParams);
 
   if (!session?.user?.id) {
     redirect(`/login?callbackUrl=${encodeURIComponent(`/${slug}/board`)}`);
@@ -49,7 +55,7 @@ export default async function ProjectBoardPage({
 
   if (!membership && !canManage) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center bg-zinc-50 dark:bg-black">
+      <div className="flex flex-1 flex-col items-center justify-center">
         <BackLink href="/dashboard" label="Back to dashboard" />
         <h1 className="mb-6 text-2xl font-semibold">{project.name}</h1>
         <JoinProjectButton slug={project.slug} />
@@ -57,8 +63,10 @@ export default async function ProjectBoardPage({
     );
   }
 
+  const assignees = await getAssignableUsers(project.id);
+
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
+    <div className="flex flex-1 flex-col">
       <ProjectNav
         slug={project.slug}
         name={project.name}
@@ -66,19 +74,32 @@ export default async function ProjectBoardPage({
         canManage={canManage}
       />
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
           <h1 className="text-xl font-semibold">Tasks</h1>
-          <CreateIssueButton slug={project.slug} />
+          <div className="flex items-start gap-2">
+            {membership && (
+              <LeaveProjectButton
+                slug={project.slug}
+                projectName={project.name}
+                userId={session.user.id}
+              />
+            )}
+            <CreateIssueButton slug={project.slug} assignees={assignees} />
+          </div>
         </div>
 
+        <IssueFilters slug={project.slug} filters={filters} assignees={assignees} />
+
         <Suspense
-          fallback={<p className="text-zinc-500">Loading tasks...</p>}
+          key={buildBoardQuery(filters)}
+          fallback={<p className="text-zinc-500">Loading tasks…</p>}
         >
           <IssueBoardSection
             slug={project.slug}
             schemaName={project.schemaName}
             canManage={canManage}
+            filters={filters}
           />
         </Suspense>
       </main>

@@ -1,17 +1,20 @@
 %%{init: {'theme': 'neutral'}}%%
 flowchart TD
-    A["Super Admin creates project"] --> B["Postgres schema<br/>provisioned<br/>(isolated per project)"]
+    A["Super Admin creates project<br/>(optionally picks members)"] --> B["Postgres schema<br/>provisioned<br/>(isolated per project)"]
     B --> C["Creator auto-added<br/>as first member"]
     C --> D{"Shareable link<br/>distributed"}
     D --> E["Other users click link<br/>and self-join"]
     D --> F["Super Admin assigns<br/>an Admin to this project"]
-    E --> G["Members create issues"]
+    E --> G["Members create tasks<br/>(priority, due date, assignee)"]
     F --> G
-    G --> H["Issues move through<br/>To Do → In Progress → Done"]
-    H --> I{"Project still needed?"}
+    G --> H["Tasks move through<br/>To Do → In Progress → Done<br/>with comments and filters"]
+    H --> L{"Someone leaves<br/>or is removed?"}
+    L -->|Yes| M["Their tasks become<br/>unassigned"]
+    M --> I
+    L -->|No| I{"Project still needed?"}
     I -->|Yes| G
     I -->|No| J["Super Admin or assigned<br/>Admin deletes project"]
-    J --> K["Schema + all issues<br/>permanently removed"]
+    J --> K["Schema + all tasks + comments<br/>permanently removed"]
 
     style A fill:#fde68a,stroke:#92400e
     style J fill:#fecaca,stroke:#7f1d1d

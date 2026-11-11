@@ -1,26 +1,347 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------- Design tokens: warm paper, deep navy ink, one amber accent ---------- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f6f3ec;
+  --foreground: #1b2433;
+  --surface: #fffdf8;
+  --border: rgba(27, 36, 51, 0.11);
+  --muted: #6e695c;
+  --accent: #ffd23f;
+  --accent-strong: #ffc414;
+  --accent-text: #1b2433;
+  --on-accent: #1b2433;
+  --focus: #2f5d8a;
+  --glow: rgba(255, 196, 20, 0.4);
+  color-scheme: light;
+}
+
+.dark {
+  --background: #0f1724;
+  --foreground: #efe9dc;
+  --surface: #172131;
+  --border: rgba(239, 233, 220, 0.11);
+  --muted: #a39d8e;
+  --accent: #ffd23f;
+  --accent-strong: #ffc414;
+  --accent-text: #ffd966;
+  --on-accent: #1b2433;
+  --focus: #ffd23f;
+  --glow: rgba(255, 210, 63, 0.24);
+  color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-text: var(--accent-text);
+  --color-on-accent: var(--on-accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Warm every grey in the app: zinc becomes Tailwind's warm "stone" scale */
+@theme {
+  --color-zinc-50: #fafaf9;
+  --color-zinc-100: #f5f5f4;
+  --color-zinc-200: #e7e5e4;
+  --color-zinc-300: #d6d3d1;
+  --color-zinc-400: #a8a29e;
+  --color-zinc-500: #78716c;
+  --color-zinc-600: #57534e;
+  --color-zinc-700: #44403c;
+  --color-zinc-800: #292524;
+  --color-zinc-900: #1c1917;
+  --color-zinc-950: #0c0a09;
+
+  --animate-fade-up: fade-up 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-fade-in: fade-in 0.25s ease-out both;
+  --animate-pop: pop 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  --animate-float: float 9s ease-in-out infinite;
+  --animate-float-slow: float 14s ease-in-out infinite reverse;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-gradient: gradient-pan 10s ease infinite;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    50% {
+      transform: translate3d(24px, -18px, 0) scale(1.08);
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+  @keyframes gradient-pan {
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
   }
 }
 
+/* ---------- Page background: very soft warm glow ---------- */
 body {
-  background: var(--background);
+  background-color: var(--background);
+  background-image:
+    radial-gradient(56rem 30rem at 6% -12%, rgba(255, 210, 63, 0.2), transparent 62%),
+    radial-gradient(44rem 26rem at 100% 0%, rgba(31, 78, 121, 0.07), transparent 58%);
+  background-attachment: fixed;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+.dark body {
+  background-image:
+    radial-gradient(56rem 30rem at 6% -12%, rgba(255, 210, 63, 0.08), transparent 62%),
+    radial-gradient(44rem 26rem at 100% 0%, rgba(56, 114, 170, 0.14), transparent 58%);
+}
+
+::selection {
+  background: rgba(255, 210, 63, 0.55);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ---------- Reusable pieces ---------- */
+.glass {
+  background-color: color-mix(in oklab, var(--background) 78%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+}
+
+.surface {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(27, 36, 51, 0.05), 0 8px 24px -18px rgba(27, 36, 51, 0.18);
+}
+
+.gradient-text {
+  background-image: linear-gradient(100deg, #1b2433, #2f5d8a 55%, #1b2433);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradient-pan 9s ease infinite;
+}
+.dark .gradient-text {
+  background-image: linear-gradient(100deg, #ffd23f, #fff0a8 55%, #ffd23f);
+}
+
+/* Deep navy banner with a faint amber glow in one corner */
+.hero-gradient {
+  background-image:
+    radial-gradient(34rem 16rem at 92% -25%, rgba(255, 210, 63, 0.34), transparent 62%),
+    linear-gradient(120deg, #172a45, #1f3d63 60%, #254a75);
+  background-size: 100% 100%, 140% 140%;
+  animation: gradient-pan 16s ease infinite;
+}
+.dark .hero-gradient {
+  background-image:
+    radial-gradient(34rem 16rem at 92% -25%, rgba(255, 210, 63, 0.2), transparent 62%),
+    linear-gradient(120deg, #13233a, #19314f 60%, #1e3b5e);
+}
+
+/* Card that lifts on hover, with a thin amber bar that grows in */
+.card-lift {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.28s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.28s ease,
+    border-color 0.28s ease;
+}
+.card-lift::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background-image: linear-gradient(90deg, var(--accent), var(--accent-strong));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.card-lift:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in oklab, var(--accent) 60%, transparent);
+  box-shadow: 0 20px 38px -24px var(--glow);
+}
+.card-lift:hover::before {
+  transform: scaleX(1);
+}
+
+.skeleton {
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(168, 162, 158, 0.28) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  background-color: rgba(168, 162, 158, 0.16);
+  animation: shimmer 1.6s linear infinite;
+  border-radius: 0.75rem;
+}
+
+/* ---------- Global polish for existing components ---------- */
+/* Every primary button in the app uses bg-foreground: make it solid amber */
+button.bg-foreground,
+a.bg-foreground {
+  background-image: linear-gradient(180deg, #ffdc5c, var(--accent-strong));
+  color: var(--on-accent);
+  border-radius: 0.7rem;
+  font-weight: 600;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset, 0 6px 14px -8px var(--glow);
+  transition: transform 0.18s ease, box-shadow 0.25s ease, filter 0.2s ease;
+}
+button.bg-foreground:not(:disabled):hover,
+a.bg-foreground:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset, 0 10px 20px -8px var(--glow);
+}
+button.bg-foreground:not(:disabled):active,
+a.bg-foreground:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Hero call-to-action: bigger, bolder and glowing so it clearly outranks the secondary */
+a.btn-hero {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border-radius: 0.9rem;
+  background-image: linear-gradient(180deg, #ffe066, var(--accent-strong));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 10px 26px -6px var(--glow),
+    0 0 0 4px color-mix(in oklab, var(--accent) 22%, transparent);
+}
+a.btn-hero:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 16px 32px -6px var(--glow),
+    0 0 0 6px color-mix(in oklab, var(--accent) 28%, transparent);
+}
+
+/* Secondary link button: quiet on purpose, so the amber primary always wins.
+   Outline is an inset shadow (not a border) so it is exactly the same size
+   as the primary button next to it. */
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.7rem;
+  font-weight: 600;
+  color: color-mix(in oklab, var(--foreground) 90%, transparent);
+  background-color: var(--surface);
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--foreground) 60%, transparent);
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+.btn-secondary:hover {
+  background-color: color-mix(in oklab, var(--foreground) 8%, var(--surface));
+  box-shadow: inset 0 0 0 1.5px var(--foreground);
+}
+
+button {
+  transition: transform 0.15s ease, background-color 0.2s ease, border-color 0.2s ease,
+    color 0.2s ease, opacity 0.2s ease;
+}
+button:not(:disabled) {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* Secondary (outlined) buttons get a soft warm hover */
+button.border:not(.bg-foreground):not(.bg-accent):not(:disabled):hover {
+  background-color: color-mix(in oklab, var(--accent) 12%, transparent);
+  border-color: color-mix(in oklab, var(--accent) 55%, transparent);
+}
+
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  border-radius: 0.7rem;
+  background-color: color-mix(in oklab, var(--surface) 94%, transparent);
+  transition: border-color 0.18s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+input:not([type="checkbox"]):not([type="radio"]):hover,
+select:hover,
+textarea:hover {
+  border-color: color-mix(in oklab, var(--accent) 50%, transparent);
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 24%, transparent);
+}
+input[type="checkbox"] {
+  accent-color: var(--accent-strong);
+}
+
+a {
+  transition: color 0.18s ease, opacity 0.18s ease;
+}
+
+table tbody tr {
+  transition: background-color 0.18s ease;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(168, 162, 158, 0.5) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

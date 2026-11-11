@@ -30,6 +30,7 @@ export const RESERVED_SLUGS = new Set([
   "admin-project",
   "dashboard",
   "login",
+  "join",
   "change-password",
   "api",
   "project",

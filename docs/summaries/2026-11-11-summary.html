@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Project Tracker - Daily Summary 2026-11-11</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Segoe UI", Arial, sans-serif; background: #eef2f7; color: #0f172a; width: 1280px; padding: 32px; }
+  h1 { font-size: 34px; letter-spacing: -0.5px; }
+  .sub { color: #475569; margin-top: 4px; font-size: 15px; }
+  .hero { background: linear-gradient(135deg, #0f172a, #1e3a8a); color: #fff; border-radius: 20px; padding: 28px 32px; display: flex; justify-content: space-between; align-items: center; }
+  .hero .sub { color: #bfdbfe; }
+  .badge { background: #22c55e; color: #052e16; font-weight: 700; padding: 6px 14px; border-radius: 999px; font-size: 13px; display: inline-block; margin-top: 12px; }
+  .ring { width: 150px; height: 150px; border-radius: 50%; background: conic-gradient(#22c55e 0 100%, #334155 0); display: flex; align-items: center; justify-content: center; }
+  .ring div { width: 112px; height: 112px; border-radius: 50%; background: #0f172a; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .ring b { font-size: 34px; }
+  .ring span { font-size: 12px; color: #94a3b8; }
+  .stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-top: 18px; }
+  .stat { background: #fff; border-radius: 16px; padding: 16px; text-align: center; box-shadow: 0 1px 3px rgba(15,23,42,.08); }
+  .stat b { display: block; font-size: 30px; color: #1d4ed8; }
+  .stat span { font-size: 12px; color: #475569; }
+  .stat.ok b { color: #16a34a; }
+  h2 { font-size: 20px; margin: 28px 0 12px; display: flex; align-items: center; gap: 10px; }
+  h2 i { font-style: normal; width: 30px; height: 30px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; font-size: 16px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .card { background: #fff; border-radius: 16px; padding: 18px; box-shadow: 0 1px 3px rgba(15,23,42,.08); border-top: 5px solid #3b82f6; }
+  .card h3 { font-size: 16px; margin-bottom: 8px; }
+  .card ul { list-style: none; font-size: 13.5px; color: #334155; line-height: 1.55; }
+  .card li::before { content: "\2713  "; color: #16a34a; font-weight: 700; }
+  .c1 { border-color: #3b82f6; } .c2 { border-color: #8b5cf6; } .c3 { border-color: #f59e0b; }
+  .c4 { border-color: #ef4444; } .c5 { border-color: #06b6d4; } .c6 { border-color: #10b981; }
+  .checks { background: #fff; border-radius: 16px; padding: 20px 24px; box-shadow: 0 1px 3px rgba(15,23,42,.08); }
+  .row { display: flex; align-items: center; gap: 12px; margin: 9px 0; font-size: 14px; }
+  .row .label { width: 250px; color: #334155; }
+  .bar { flex: 1; height: 14px; background: #e2e8f0; border-radius: 999px; overflow: hidden; }
+  .bar div { height: 100%; background: linear-gradient(90deg, #22c55e, #16a34a); border-radius: 999px; }
+  .row .val { width: 110px; text-align: right; font-weight: 700; color: #166534; }
+  .warn { background: #fffbeb; border: 2px solid #f59e0b; border-radius: 16px; padding: 18px 22px; }
+  .warn h3 { color: #b45309; margin-bottom: 6px; font-size: 17px; }
+  .warn p, .warn li { font-size: 13.5px; color: #78350f; line-height: 1.6; }
+  .warn ul { margin: 6px 0 0 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .box { background: #fff; border-radius: 16px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(15,23,42,.08); }
+  .box h3 { font-size: 16px; margin-bottom: 8px; }
+  .box li { font-size: 13.5px; color: #334155; line-height: 1.6; margin-left: 18px; }
+  .todo { border-left: 6px solid #ef4444; }
+  .never { border-left: 6px solid #94a3b8; }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .step { background: #0f172a; color: #e2e8f0; border-radius: 16px; padding: 16px 18px; }
+  .step b { display: block; font-size: 26px; color: #38bdf8; }
+  .step p { font-size: 13.5px; line-height: 1.5; margin-top: 4px; }
+  code { background: #1e293b; color: #7dd3fc; padding: 1px 6px; border-radius: 6px; font-size: 12px; }
+  .foot { margin-top: 22px; text-align: center; color: #64748b; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div>
+    <h1>Project Tracker - Daily Summary</h1>
+    <div class="sub">Wednesday, 11 November 2026 &nbsp;|&nbsp; Roadmap built and tested locally - NOT yet verified on your Supabase database</div>
+    <span class="badge">Nothing committed or pushed - you review, then push</span>
+  </div>
+  <div class="ring"><div><b>10/10</b><span>roadmap items</span></div></div>
+</div>
+
+<div class="stats">
+  <div class="stat ok"><b>307</b><span>unit tests (mocked, no DB)</span></div>
+  <div class="stat ok"><b>55/55</b><span>E2E checks (LOCAL test DB)</span></div>
+  <div class="stat ok"><b>6/6</b><span>schema tests (LOCAL test DB)</span></div>
+  <div class="stat"><b>84</b><span>files changed / added</span></div>
+  <div class="stat"><b>2</b><span>review agents</span></div>
+  <div class="stat"><b>26/31</b><span>review findings fixed</span></div>
+</div>
+
+<h2><i style="background:#dcfce7">&#10003;</i> What was built today</h2>
+<div class="grid3">
+  <div class="card c1">
+    <h3>1. Issue tracking</h3>
+    <ul>
+      <li>Priority, due date, assignee</li>
+      <li>Edit every field on a task page</li>
+      <li>Comment threads (delete: author or manager)</li>
+      <li>Search, filters, sorting, pagination</li>
+      <li>Overdue tasks highlighted</li>
+      <li>Old projects upgrade themselves</li>
+    </ul>
+  </div>
+  <div class="card c2">
+    <h3>2. Project members</h3>
+    <ul>
+      <li>Members can leave a project</li>
+      <li>Managers can remove members</li>
+      <li>Their tasks become unassigned</li>
+      <li>Confirm dialogs, "you" badge</li>
+    </ul>
+  </div>
+  <div class="card c3">
+    <h3>3. Admin console</h3>
+    <ul>
+      <li>Edit username, name, email</li>
+      <li>Reset password (forced change, lockout cleared)</li>
+      <li>Admin assignment history table</li>
+    </ul>
+  </div>
+  <div class="card c4">
+    <h3>4. Security</h3>
+    <ul>
+      <li>Rate limits on tasks, comments, passwords, members, admin actions</li>
+      <li>Security headers on every response (CSP, HSTS, no framing, no sniffing)</li>
+    </ul>
+  </div>
+  <div class="card c5">
+    <h3>5. UI / UX</h3>
+    <ul>
+      <li>Light, dark and system themes + toggle</li>
+      <li>All pages checked in real Chrome, both themes</li>
+      <li>Due-date wrapping fixed</li>
+    </ul>
+  </div>
+  <div class="card c6">
+    <h3>6. Docs and process</h3>
+    <ul>
+      <li>README, project.md, FEATURES.md rewritten</li>
+      <li>Use-case diagrams re-rendered</li>
+      <li>FEEDBACK.md inbox + summary rule</li>
+    </ul>
+  </div>
+</div>
+
+<h2><i style="background:#dbeafe">&#9881;</i> How it was verified (final code)</h2>
+<div class="checks">
+  <div class="warn" style="margin-bottom:12px;padding:12px 16px"><p><b>Every database check below ran on a throwaway LOCAL PostgreSQL 17 on this PC (deleted afterwards). None of them ran on your Supabase database.</b></p></div>
+  <div class="row"><span class="label">Type check + lint</span><div class="bar"><div style="width:100%"></div></div><span class="val">clean</span></div>
+  <div class="row"><span class="label">Production build</span><div class="bar"><div style="width:100%"></div></div><span class="val">passes</span></div>
+  <div class="row"><span class="label">Unit tests</span><div class="bar"><div style="width:100%"></div></div><span class="val">307 / 307</span></div>
+  <div class="row"><span class="label">Schema tests - local Postgres 17</span><div class="bar"><div style="width:100%"></div></div><span class="val">6 / 6</span></div>
+  <div class="row"><span class="label">End-to-end - local Postgres 17</span><div class="bar"><div style="width:100%"></div></div><span class="val">55 / 55</span></div>
+  <div class="row"><span class="label">Visual pass - local Postgres 17</span><div class="bar"><div style="width:100%"></div></div><span class="val">done</span></div>
+  <div class="row"><span class="label"><b>Final code on YOUR Supabase</b></span><div class="bar"><div style="width:0%"></div></div><span class="val" style="color:#b91c1c">0 - not tested</span></div>
+  <p style="font-size:12.5px;color:#475569;margin-top:10px">Earlier today, before the connection broke, the first versions did run on Supabase: issues 32/32, members all passed, admin 46/47 (the one miss was a test-script bug). The final code was not re-run there.</p>
+</div>
+
+<h2><i style="background:#fef3c7">&#9888;</i> Blocked / needs attention</h2>
+<div class="warn">
+  <h3>Supabase is unreachable from this machine</h3>
+  <p>The network connection opens and TLS is accepted, but the Postgres handshake gets no reply. A raw-socket test shows this is not an app-code problem. The final code was therefore verified only on a throwaway local Postgres 17 (since deleted). Your live site connects through Vercel, which uses a different route.</p>
+  <ul>
+    <li>Check Supabase &rarr; Settings &rarr; Database &rarr; <b>Network Bans</b> for this machine's IP</li>
+    <li>Earlier cloud test runs may have left <code>e2e_*</code> users in the real database</li>
+    <li>Not tested on Vercel; not tested with <code>next dev</code></li>
+  </ul>
+</div>
+
+<div class="grid2" style="margin-top:14px">
+  <div class="box todo">
+    <h3>Still to do (needs you / the database)</h3>
+    <ul>
+      <li>Fix or confirm the Supabase connection</li>
+      <li>Run the cleanup script on the real database</li>
+      <li>Try the app, then write feedback in <code>FEEDBACK.md</code></li>
+      <li>Check login on the live site after deploying</li>
+      <li>5 review findings left open: dialog focus trap and scroll lock, saved-message live region and unsaved-changes warning, <code>GET /issues</code> API ignores search params</li>
+      <li>Commit and push (only you do this)</li>
+    </ul>
+  </div>
+  <div class="box never">
+    <h3>Not built (out of scope so far)</h3>
+    <ul>
+      <li>Private / invite-only projects, ownership transfer, archiving</li>
+      <li>Attachments, labels, sub-tasks, activity history</li>
+      <li>Notifications and drag-and-drop board</li>
+      <li>Bulk admin actions and full audit log</li>
+      <li>Email password reset, 2FA, social login</li>
+    </ul>
+  </div>
+</div>
+
+<h2><i style="background:#e0e7ff">&#10148;</i> Your next three steps</h2>
+<div class="steps">
+  <div class="step"><b>1</b><p>Fix the database connection, then run <code>node --env-file=.env scripts/e2e-cleanup.mjs</code>.</p></div>
+  <div class="step"><b>2</b><p>Run <code>npm run dev</code>, click through board, task page, admin console and the theme toggle.</p></div>
+  <div class="step"><b>3</b><p>Put anything you want changed in <code>FEEDBACK.md</code> under Inbox. I read it after every task.</p></div>
+</div>
+
+<div class="foot">Generated from PROGRESS.md, git status and the day's test runs &nbsp;|&nbsp; aXet.code</div>
+
+</body>
+</html>

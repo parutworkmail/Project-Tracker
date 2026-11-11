@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { createUserSchema, createUserFormSchema } from "./admin";
+import {
+  createUserSchema,
+  createUserFormSchema,
+  resetPasswordSchema,
+  updateUserSchema,
+} from "./admin";
 
 describe("createUserSchema", () => {
   it("accepts a minimal valid payload (no name/email, default role)", () => {
@@ -140,5 +145,36 @@ describe("createUserFormSchema", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe("updateUserSchema", () => {
+  it("normalizes empty name/email to null and trims values", () => {
+    const result = updateUserSchema.parse({ name: "  ", email: "", username: " abc " });
+    expect(result).toEqual({ name: null, email: null, username: "abc" });
+  });
+
+  it("leaves omitted fields undefined", () => {
+    const result = updateUserSchema.parse({ role: "ADMIN" });
+    expect(result.username).toBeUndefined();
+    expect(result.name).toBeUndefined();
+    expect(result.email).toBeUndefined();
+  });
+
+  it("rejects an empty object and invalid values", () => {
+    expect(updateUserSchema.safeParse({}).success).toBe(false);
+    expect(updateUserSchema.safeParse({ username: "ab" }).success).toBe(false);
+    expect(updateUserSchema.safeParse({ email: "not-an-email" }).success).toBe(false);
+    expect(updateUserSchema.safeParse({ role: "ROOT" }).success).toBe(false);
+    expect(updateUserSchema.safeParse({ name: "a".repeat(81) }).success).toBe(false);
+  });
+});
+
+describe("resetPasswordSchema", () => {
+  it("enforces 8-72 characters", () => {
+    expect(resetPasswordSchema.safeParse({ password: "1234567" }).success).toBe(false);
+    expect(resetPasswordSchema.safeParse({ password: "12345678" }).success).toBe(true);
+    expect(resetPasswordSchema.safeParse({ password: "a".repeat(72) }).success).toBe(true);
+    expect(resetPasswordSchema.safeParse({ password: "a".repeat(73) }).success).toBe(false);
   });
 });

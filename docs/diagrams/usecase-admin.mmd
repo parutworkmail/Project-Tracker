@@ -4,16 +4,17 @@ flowchart TD
 
     subgraph SYS["Project Tracker System"]
         direction TB
-        UC1(("Rename / delete<br/>ONLY projects<br/>they're assigned to"))
-        UC2(("Access an assigned<br/>project without joining"))
-        UC3(("Join a project<br/>via link"))
-        UC4(("Create / view issues<br/>(if a member or assigned)"))
-        UC5(("Update issue status<br/>(if a member or assigned)"))
-        UC6(("Log in"))
-        UC7(("Change own password"))
+        UC1(("Rename / re-link / delete<br/>ONLY projects<br/>they're assigned to"))
+        UC2(("Add / remove members<br/>of assigned projects"))
+        UC3(("Access an assigned<br/>project without joining"))
+        UC4(("Join / leave a project"))
+        UC5(("Create, edit, assign and comment on tasks<br/>(if a member or assigned)"))
+        UC6(("Delete tasks and any comment<br/>in assigned projects"))
+        UC7(("Search / filter / sort tasks"))
+        UC8(("Log in / change own password"))
     end
 
-    AD --> UC1 & UC2 & UC3 & UC4 & UC5 & UC6 & UC7
+    AD --> UC1 & UC2 & UC3 & UC4 & UC5 & UC6 & UC7 & UC8
 
     Note["⚠️ On any project NOT assigned<br/>to them, an Admin has exactly<br/>the same access as a plain User."]
     style Note fill:#fef3c7,stroke:#92400e,stroke-dasharray: 4 2

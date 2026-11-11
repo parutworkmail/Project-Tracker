@@ -10,12 +10,44 @@
   (origin remote, forked from the original to the user's personal
   account — see PROGRESS.md "Session: repo ownership transfer").
 
-## Git push: manual only, by the user (standing rule)
-User pushes to `origin` themselves from now on. Do NOT run `git push`
-unless the user explicitly asks for it in that specific message — a
-past "yes, push" does not carry forward to later tasks or sessions.
-Commit locally as normal; just stop before the push and tell the user
-their local `main` is ready to push.
+## Git push: manual only, by the user — RULE ZERO FOR PUSH, READ BEFORE ANY `git push` (no exceptions)
+This rule has already been violated once (bundling push into an
+`ask_user` option). It is being restated in the strongest possible terms
+because "I forgot" or "I inferred consent" is not acceptable here.
+
+1. **Default state: push is FORBIDDEN.** Every single session, every
+   single task, starts with push forbidden. There is no standing
+   permission, no memory of a past session's "yes", no carry-over.
+2. **The ONLY thing that lifts the ban**: the user's CURRENT message, in
+   plain text, contains an unambiguous, dedicated instruction to push —
+   e.g. "push", "push it", "yes push now". That instruction must be
+   about pushing specifically, not buried inside a bundled option like
+   "validate + commit + push" in an `ask_user` menu, not inferred from
+   "looks done", not inferred from "ship it" / "wrap up" / "finish this"
+   alone (ask explicitly if those are ambiguous about push vs. just
+   commit).
+3. **One instruction = ONE push, exactly once.** The moment `git push`
+   succeeds, the permission is immediately and fully consumed. Do NOT:
+   - push again later in the same session without a brand new explicit
+     instruction, even if more commits pile up afterward
+   - push multiple pending commits across several topics as if one
+     "push" covers all of them going forward
+   - treat "push" as toggling some ongoing mode — it authorizes exactly
+     one `git push` invocation, immediately, for what's committed right
+     now, then reverts to forbidden.
+4. **Never offer push as a bundled choice.** Any `ask_user` call,
+   multi-step plan, or internal checklist must NEVER include "push" as
+   part of a combined option (e.g. "validate+commit+push",
+   "test and ship"). Validate and commit, then STOP. If uncertain
+   whether the user wants a push, ask ONLY about the push, as its own
+   separate, single-purpose question — never pre-select it, never phrase
+   it so a generic "yes" could be read as covering it.
+5. **After any push**, explicitly state in your reply that you pushed and
+   what was pushed. Never push silently.
+6. **If genuinely unsure whether the current message authorizes a push**:
+   treat it as NOT authorized. Commit locally, tell the user their branch
+   is ready, and stop. Under-asking is always safe here; over-pushing is
+   the failure mode this rule exists to prevent.
 
 ## Validation tiers: light while developing, full only before a push (standing rule)
 Full tsc + lint + build + full test suite + an agent validator pass on
@@ -71,6 +103,44 @@ protocol all depend on the log being written first. Full mechanics of
 what goes in the log and how it's trimmed/folded over time are in
 "Crash-Safe Task Logging" below — but the ONE non-negotiable part is:
 log BEFORE, not after, with no exceptions for how small the ask looks.
+
+## Feedback queue (standing rule)
+The user leaves feedback in `FEEDBACK.md` (Inbox section). After finishing
+every task, re-read it, handle new items next (before the roadmap), and
+move handled items to Done. Post a short "ready to test" chat message
+(what to click) when a feature is verified, then keep working.
+
+## Daily summary = infographic (standing rule)
+**Use the `daily-summary-infographic` skill** (`.axet-code/skills/daily-summary-infographic/SKILL.md`)
+for this - it has the fast step-by-step, the approved template, and the
+facts/render scripts (`scripts/summary-facts.mjs`, `scripts/render-html.mjs`).
+Summary of the rule:
+When the user asks for a summary of the day / "what have you done and what
+is left", do NOT answer with a long text list. Gather everything from
+`PROGRESS.md`, git status and the day's test results, then produce an
+infographic: write `docs/summaries/YYYY-MM-DD-summary.html`, render it to
+`docs/summaries/YYYY-MM-DD-summary.png` with `node scripts/render-html.mjs`,
+view the PNG to check it, then OPEN IT FOR THE USER in their default image
+viewer (never leave that to them): run
+`powershell -NoProfile -Command "Start-Process -FilePath '<absolute png path>'"`.
+Finish with the file path plus a 2-3 line text recap.
+
+Accuracy rules for the infographic (a wrong number here already cost the
+user's trust once — "Real-database tests 6/6" was run on a local throwaway
+DB, not the real one):
+- Every figure must come from a command run or a file read in THIS session
+  (git status -uall for file counts, test output for pass counts, the
+  actual number of agents spawned, findings fixed vs left open). Never
+  round up, never reuse an earlier recap's number without re-checking.
+- Every check that touches a database MUST name which one ("local test
+  Postgres" vs "the user's Supabase"). Only the user's Supabase may be
+  called "real". If the final code was never run on Supabase, say so in
+  red on the page.
+- Never write "all fixed" / "all passing" unless true; show X/Y and list
+  what is left open.
+- If the PNG is locked because the viewer has it open, render to a new
+  `-v2.png` name instead of failing. Always include: what was done, verification numbers, what is
+NOT done / blocked, what was never built, and what the user must do.
 
 ## Session Start
 Read `PROGRESS.md` first — it tracks what's done, known loose ends, and next

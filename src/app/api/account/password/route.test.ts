@@ -7,6 +7,16 @@ const { authMock, userUpdate } = vi.hoisted(() => ({
 
 vi.mock("@/auth", () => ({ auth: authMock }));
 
+const { enforceRateLimit } = vi.hoisted(() => ({
+  enforceRateLimit: vi.fn(),
+}));
+
+vi.mock("@/lib/enforceRateLimit", () => ({
+  enforceRateLimit,
+  MINUTE: 60000,
+  HOUR: 3600000,
+}));
+
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: { update: userUpdate },
@@ -15,6 +25,11 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 import { PATCH } from "./route";
+
+beforeEach(() => {
+  enforceRateLimit.mockReset();
+  enforceRateLimit.mockResolvedValue(null);
+});
 
 function jsonRequest(body: unknown) {
   return new Request("http://localhost/api/account/password", {

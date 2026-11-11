@@ -8,6 +8,16 @@ const { authMock, userFindMany, userCreate } = vi.hoisted(() => ({
 
 vi.mock("@/auth", () => ({ auth: authMock }));
 
+const { enforceRateLimit } = vi.hoisted(() => ({
+  enforceRateLimit: vi.fn(),
+}));
+
+vi.mock("@/lib/enforceRateLimit", () => ({
+  enforceRateLimit,
+  MINUTE: 60000,
+  HOUR: 3600000,
+}));
+
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: { findMany: userFindMany, create: userCreate },
@@ -17,6 +27,11 @@ vi.mock("@/lib/prisma", () => ({
 
 import { Prisma } from "@/generated/prisma/client";
 import { GET, POST } from "./route";
+
+beforeEach(() => {
+  enforceRateLimit.mockReset();
+  enforceRateLimit.mockResolvedValue(null);
+});
 
 function jsonRequest(body: unknown) {
   return new Request("http://localhost/api/admin/users", {

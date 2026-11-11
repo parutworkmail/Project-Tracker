@@ -6,6 +6,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { addProjectMemberSchema } from "@/lib/validation/project";
 import { canManageProject } from "@/lib/permissions";
 import { withApiErrorHandling } from "@/lib/apiError";
+import { enforceRateLimit, HOUR } from "@/lib/enforceRateLimit";
 
 async function handlePOST(
   request: Request,
@@ -15,6 +16,18 @@ async function handlePOST(
 
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const limited = await enforceRateLimit({
+    scope: "member-add",
+    subject: session.user.id,
+    limit: 60,
+    windowMs: HOUR,
+    message: "Too many members added. Please try again later.",
+  });
+
+  if (limited) {
+    return limited;
   }
 
   const { slug } = await params;
@@ -35,18 +48,24 @@ async function handlePOST(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
   const parsed = addProjectMemberSchema.safeParse(body);
 
   if (!parsed.success) {
     return NextResponse.json(
-      { error: parsed.error.flatten() },
+      { error: parsed.error.issues[0]?.message ?? "Invalid request" },
       { status: 400 }
     );
   }
 
   const targetUser = await prisma.user.findUnique({
-    where: { username: parsed.data.username },
+    where: { username: parsed.data.username.trim() },
   });
 
   if (!targetUser) {

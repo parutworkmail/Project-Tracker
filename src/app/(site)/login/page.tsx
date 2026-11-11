@@ -75,9 +75,25 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex flex-1 items-center justify-center bg-zinc-50 dark:bg-black">
-      <div className="w-full max-w-sm rounded-lg border border-black/[.08] bg-white p-8 dark:border-white/[.145] dark:bg-black">
-        <h1 className="mb-6 text-2xl font-semibold">Log in</h1>
+    <div className="relative flex flex-1 items-center justify-center overflow-hidden px-4 py-12">
+      <div
+        aria-hidden="true"
+        className="animate-float pointer-events-none absolute -left-20 top-0 h-72 w-72 rounded-full bg-yellow-300/25 blur-3xl"
+      />
+      <div
+        aria-hidden="true"
+        className="animate-float-slow pointer-events-none absolute -right-16 bottom-0 h-80 w-80 rounded-full bg-blue-500/12 blur-3xl"
+      />
+      <div className="surface animate-pop relative w-full max-w-sm rounded-3xl p-8 shadow-xl shadow-slate-900/10">
+        <div className="mb-6 flex flex-col items-center text-center">
+          <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-yellow-200 to-yellow-400 text-on-accent shadow-lg shadow-yellow-500/25">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M5 12l4 4L19 6" />
+            </svg>
+          </span>
+          <h1 className="text-2xl font-semibold tracking-tight">Log in</h1>
+          <p className="mt-1 text-sm text-muted">Welcome back. Sign in to continue.</p>
+        </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
@@ -90,7 +106,7 @@ function LoginForm() {
               autoComplete="username"
               placeholder="Username"
               {...register("username")}
-              className="rounded border border-black/[.08] px-3 py-2 dark:border-white/[.145] dark:bg-black"
+              className="rounded border border-black/[.08] px-3 py-2 dark:border-white/[.145] dark:bg-surface"
             />
             {errors.username && (
               <p role="alert" className="text-sm text-red-600">
@@ -108,7 +124,7 @@ function LoginForm() {
               autoComplete="current-password"
               placeholder="Password"
               {...register("password")}
-              className="rounded border border-black/[.08] py-2 pl-3 dark:border-white/[.145] dark:bg-black"
+              className="rounded border border-black/[.08] py-2 pl-3 dark:border-white/[.145] dark:bg-surface"
             />
             {errors.password && (
               <p role="alert" className="text-sm text-red-600">

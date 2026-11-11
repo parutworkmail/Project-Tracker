@@ -48,3 +48,49 @@ export async function canAccessProject(
 
   return canManageProject(userId, role, projectId);
 }
+
+export interface AssignableUser {
+  id: string;
+  username: string;
+  name: string | null;
+}
+
+export async function getAssignableUsers(
+  projectId: string
+): Promise<AssignableUser[]> {
+  const [members, admins] = await Promise.all([
+    prisma.projectMember.findMany({
+      where: { projectId },
+      select: { user: { select: { id: true, username: true, name: true } } },
+    }),
+    prisma.projectAdmin.findMany({
+      where: { projectId },
+      select: { user: { select: { id: true, username: true, name: true } } },
+    }),
+  ]);
+
+  const byId = new Map<string, AssignableUser>();
+  for (const row of [...members, ...admins]) {
+    byId.set(row.user.id, row.user);
+  }
+
+  return [...byId.values()].sort((a, b) =>
+    a.username.localeCompare(b.username)
+  );
+}
+
+export async function isAssignableUser(
+  projectId: string,
+  userId: string
+): Promise<boolean> {
+  const [membership, assignment] = await Promise.all([
+    prisma.projectMember.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+    }),
+    prisma.projectAdmin.findUnique({
+      where: { projectId_userId: { projectId, userId } },
+    }),
+  ]);
+
+  return membership !== null || assignment !== null;
+}

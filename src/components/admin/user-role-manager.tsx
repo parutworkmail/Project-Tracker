@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import {
+  EditUserDialog,
+  ResetPasswordDialog,
+} from "@/components/admin/user-edit-dialogs";
+
 type Role = "SUPER_ADMIN" | "ADMIN" | "USER";
 
 interface UserRow {
@@ -25,6 +30,8 @@ export function UserRoleManager({
   const router = useRouter();
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<UserRow | null>(null);
+  const [resetting, setResetting] = useState<UserRow | null>(null);
 
   function setPending(userId: string, pending: boolean) {
     setPendingIds((prev) => {
@@ -92,7 +99,12 @@ export function UserRoleManager({
 
   return (
     <div className="flex flex-col gap-2">
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-red-600">
+          {error}
+        </p>
+      )}
+      <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-zinc-500">
@@ -117,12 +129,13 @@ export function UserRoleManager({
                   <span className="text-zinc-500">{user.role} (you)</span>
                 ) : (
                   <select
+                    aria-label={`Role of ${user.username}`}
                     value={user.role}
                     disabled={pendingIds.has(user.id)}
                     onChange={(e) =>
                       changeRole(user.id, e.target.value as Role)
                     }
-                    className="rounded border border-black/[.08] bg-white px-2 py-1 dark:border-white/[.145] dark:bg-black"
+                    className="rounded border border-black/[.08] bg-surface px-2 py-1 dark:border-white/[.145]"
                   >
                     {ROLES.map((role) => (
                       <option key={role} value={role}>
@@ -133,21 +146,53 @@ export function UserRoleManager({
                 )}
               </td>
               <td className="py-2 text-right">
-                {user.id !== currentUserId && (
+                <div className="flex justify-end gap-2">
                   <button
                     type="button"
-                    disabled={pendingIds.has(user.id)}
-                    onClick={() => deleteUser(user.id, user.username)}
-                    className="rounded border border-red-600 px-2 py-1 text-xs text-red-600 disabled:opacity-50"
+                    aria-label={`Edit ${user.username}`}
+                    onClick={() => setEditing(user)}
+                    className="rounded border border-black/[.08] px-2 py-1 text-xs dark:border-white/[.145]"
                   >
-                    Delete
+                    Edit
                   </button>
-                )}
+                  {user.id !== currentUserId && (
+                    <>
+                      <button
+                        type="button"
+                        aria-label={`Reset password for ${user.username}`}
+                        onClick={() => setResetting(user)}
+                        className="rounded border border-black/[.08] px-2 py-1 text-xs dark:border-white/[.145]"
+                      >
+                        Reset password
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pendingIds.has(user.id)}
+                        aria-label={`Delete ${user.username}`}
+                        onClick={() => deleteUser(user.id, user.username)}
+                        className="rounded border border-red-600 px-2 py-1 text-xs text-red-600 disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </div>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      </div>
+
+      {editing && (
+        <EditUserDialog user={editing} onClose={() => setEditing(null)} />
+      )}
+      {resetting && (
+        <ResetPasswordDialog
+          user={resetting}
+          onClose={() => setResetting(null)}
+        />
+      )}
     </div>
   );
 }

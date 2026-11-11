@@ -49,6 +49,52 @@ export const updateUserRoleSchema = z.object({
 
 export type UpdateUserRoleInput = z.infer<typeof updateUserRoleSchema>;
 
+const optionalClearable = (schema: z.ZodString) =>
+  schema
+    .nullable()
+    .optional()
+    .transform((value) =>
+      value === undefined ? undefined : (value?.trim() ? value.trim() : null)
+    );
+
+export const updateUserSchema = z
+  .object({
+    username: z
+      .string()
+      .trim()
+      .min(3, "Username must be at least 3 characters.")
+      .max(32, "Username must be at most 32 characters.")
+      .regex(
+        USERNAME_PATTERN,
+        "Username may only contain letters, numbers, dots, dashes and underscores."
+      )
+      .optional(),
+    name: optionalClearable(z.string().max(80, "Name is too long.")),
+    email: z
+      .union([
+        z.string().trim().email("Enter a valid email address."),
+        z.literal(""),
+        z.null(),
+      ])
+      .optional()
+      .transform((value) => (value === undefined ? undefined : value || null)),
+    role: z.enum(["SUPER_ADMIN", "ADMIN", "USER"]).optional(),
+  })
+  .refine((data) => Object.values(data).some((value) => value !== undefined), {
+    message: "At least one field is required.",
+  });
+
+export type UpdateUserInput = z.input<typeof updateUserSchema>;
+
+export const resetPasswordSchema = z.object({
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters.")
+    .max(72, "Password must be at most 72 characters."),
+});
+
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
 export const assignProjectAdminSchema = z.object({
   userId: z.string().min(1, "userId is required."),
 });

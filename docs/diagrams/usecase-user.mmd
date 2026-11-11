@@ -4,13 +4,15 @@ flowchart TD
 
     subgraph SYS["Project Tracker System"]
         direction TB
-        UC1(("Join a project<br/>via link"))
-        UC2(("Create / view issues<br/>(in projects they joined)"))
-        UC3(("Update issue status<br/>(in projects they joined)"))
-        UC4(("Log in"))
-        UC5(("Change own password"))
+        UC1(("Join a project via link<br/>or leave it"))
+        UC2(("Create and edit tasks<br/>(priority, due date, assignee)"))
+        UC3(("Change task status"))
+        UC4(("Comment on tasks;<br/>delete own comments"))
+        UC5(("Search / filter / sort tasks"))
+        UC6(("Switch light / dark theme"))
+        UC7(("Log in / change own password"))
     end
 
-    US --> UC1 & UC2 & UC3 & UC4 & UC5
+    US --> UC1 & UC2 & UC3 & UC4 & UC5 & UC6 & UC7
 
     style US fill:#bbf7d0,stroke:#14532d

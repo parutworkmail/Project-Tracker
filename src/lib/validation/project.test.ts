@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   createIssueSchema,
   createProjectSchema,
+  createCommentSchema,
+  updateIssueSchema,
   updateIssueStatusSchema,
 } from "./project";
 
@@ -85,5 +87,66 @@ describe("updateIssueStatusSchema", () => {
 
   it("rejects a missing status", () => {
     expect(updateIssueStatusSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe('createIssueSchema extra fields', () => {
+  it('accepts priority, due date and assignee', () => {
+    expect(
+      createIssueSchema.safeParse({
+        title: 'x',
+        priority: 'urgent',
+        dueDate: '2028-02-29',
+        assigneeId: 'u1',
+      }).success
+    ).toBe(true);
+  });
+
+  it('accepts empty-string and null optional values', () => {
+    expect(
+      createIssueSchema.safeParse({ title: 'x', dueDate: '', assigneeId: null, description: null })
+        .success
+    ).toBe(true);
+  });
+
+  it('rejects impossible calendar dates and malformed dates', () => {
+    expect(createIssueSchema.safeParse({ title: 'x', dueDate: '2027-02-29' }).success).toBe(false);
+    expect(createIssueSchema.safeParse({ title: 'x', dueDate: '01/02/2027' }).success).toBe(false);
+  });
+
+  it('rejects an unknown priority and a whitespace-only title', () => {
+    expect(createIssueSchema.safeParse({ title: 'x', priority: 'asap' }).success).toBe(false);
+    expect(createIssueSchema.safeParse({ title: '   ' }).success).toBe(false);
+  });
+});
+
+describe('updateIssueSchema', () => {
+  it('accepts any single field', () => {
+    expect(updateIssueSchema.safeParse({ title: 'New' }).success).toBe(true);
+    expect(updateIssueSchema.safeParse({ priority: 'low' }).success).toBe(true);
+    expect(updateIssueSchema.safeParse({ assigneeId: null }).success).toBe(true);
+    expect(updateIssueSchema.safeParse({ dueDate: null }).success).toBe(true);
+  });
+
+  it('rejects an empty object', () => {
+    expect(updateIssueSchema.safeParse({}).success).toBe(false);
+  });
+
+  it('rejects an invalid status or empty title', () => {
+    expect(updateIssueSchema.safeParse({ status: 'nope' }).success).toBe(false);
+    expect(updateIssueSchema.safeParse({ title: '' }).success).toBe(false);
+  });
+});
+
+describe('createCommentSchema', () => {
+  it('trims and accepts a normal comment', () => {
+    const result = createCommentSchema.safeParse({ body: '  hi  ' });
+    expect(result.success && result.data.body).toBe('hi');
+  });
+
+  it('rejects empty, whitespace-only and over-long comments', () => {
+    expect(createCommentSchema.safeParse({ body: '' }).success).toBe(false);
+    expect(createCommentSchema.safeParse({ body: '   ' }).success).toBe(false);
+    expect(createCommentSchema.safeParse({ body: 'a'.repeat(2001) }).success).toBe(false);
   });
 });
