@@ -80,3 +80,53 @@ export function userLabel(user: {
 }): string {
   return user.name ? `${user.name} (${user.username})` : user.username;
 }
+
+export interface ActivityLike {
+  kind: string;
+  field: string | null;
+  old_value: string | null;
+  new_value: string | null;
+}
+
+function statusText(value: string | null): string {
+  return value && value in STATUS_LABELS
+    ? STATUS_LABELS[value as IssueStatus]
+    : (value ?? "none");
+}
+
+function priorityText(value: string | null): string {
+  return value && value in PRIORITY_LABELS
+    ? PRIORITY_LABELS[value as IssuePriority]
+    : (value ?? "none");
+}
+
+export function describeActivity(
+  activity: ActivityLike,
+  nameOf: (userId: string | null) => string
+): string {
+  if (activity.kind === "created") return "created this task";
+  if (activity.kind === "commented") return "added a comment";
+
+  const { old_value: from, new_value: to } = activity;
+
+  switch (activity.field) {
+    case "title":
+      return `renamed the task from "${from ?? ""}" to "${to ?? ""}"`;
+    case "description":
+      return "updated the description";
+    case "status":
+      return `changed the status from ${statusText(from)} to ${statusText(to)}`;
+    case "priority":
+      return `changed the priority from ${priorityText(from)} to ${priorityText(to)}`;
+    case "due_date":
+      if (!to) return "cleared the due date";
+      if (!from) return `set the due date to ${formatDueDate(to)}`;
+      return `changed the due date from ${formatDueDate(from)} to ${formatDueDate(to)}`;
+    case "assignee_id":
+      if (!to) return `unassigned ${nameOf(from)}`;
+      if (!from) return `assigned this to ${nameOf(to)}`;
+      return `reassigned this from ${nameOf(from)} to ${nameOf(to)}`;
+    default:
+      return "updated the task";
+  }
+}

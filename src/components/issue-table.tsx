@@ -17,6 +17,7 @@ import {
 
 interface Issue {
   id: string;
+  number: number;
   title: string;
   status: IssueStatus;
   priority: IssuePriority;
@@ -139,6 +140,7 @@ export function IssueTable({
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-black/[.06] bg-accent/[.08] text-left text-xs uppercase tracking-wide text-muted dark:border-white/[.08] dark:bg-accent/[.08]">
+              <th className="w-14 px-3 py-2 font-medium">#</th>
               <th className="px-3 py-2 font-medium">Title</th>
               <th className="px-3 py-2 font-medium">Status</th>
               <th className="px-3 py-2 font-medium">Priority</th>
@@ -167,6 +169,9 @@ export function IssueTable({
                   style={{ animationDelay: `${Math.min(index, 10) * 30}ms` }}
                   className="animate-fade-in border-b border-black/[.06] last:border-b-0 hover:bg-accent/[.08] dark:border-white/[.08] dark:hover:bg-accent/[.08]"
                 >
+                  <td className="whitespace-nowrap px-3 py-2 text-xs text-zinc-500">
+                    #{issue.number}
+                  </td>
                   <td className="max-w-xs px-3 py-2 font-medium">
                     <Link
                       href={`/${slug}/board/${issue.id}`}

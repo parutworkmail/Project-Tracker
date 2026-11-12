@@ -15,6 +15,7 @@ vi.mock("@/lib/prisma", () => ({
 import {
   addComment,
   deleteComment,
+  diffIssue,
   ensureProjectSchema,
   generateSchemaName,
   getComment,
@@ -80,7 +81,7 @@ describe("ensureProjectSchema", () => {
       executeRawUnsafe.mock.calls.filter((c) =>
         String(c[0]).includes("CREATE TABLE IF NOT EXISTS")
       ).length
-    ).toBe(2);
+    ).toBe(3);
   });
 
   it("skips ALTER when the columns already exist", async () => {
@@ -88,6 +89,7 @@ describe("ensureProjectSchema", () => {
     queryRawUnsafe.mockResolvedValue([
       { column_name: "priority" },
       { column_name: "due_date" },
+      { column_name: "number" },
     ]);
 
     await ensureProjectSchema(schema);
@@ -224,6 +226,104 @@ describe("updateIssue", () => {
 
     expect(result).toEqual({ id: "i1" });
     expect(queryRawUnsafe.mock.calls[0][0]).toContain("SELECT");
+  });
+
+  it("records one activity row per changed field when an actor is given", async () => {
+    const schema = await fresh();
+    queryRawUnsafe
+      .mockResolvedValueOnce([
+        {
+          id: "i1",
+          title: "Old",
+          description: null,
+          status: "todo",
+          priority: "medium",
+          due_date: null,
+          assignee_id: null,
+        },
+      ])
+      .mockResolvedValueOnce([{ id: "i1" }]);
+
+    await updateIssue(
+      schema,
+      "i1",
+      { title: "Old", status: "done", priority: "high" },
+      "actor-1"
+    );
+
+    const inserts = executeRawUnsafe.mock.calls.filter((c) =>
+      String(c[0]).includes('"activity"')
+    );
+    expect(inserts).toHaveLength(2);
+    expect(inserts.map((c) => c[5])).toEqual(["status", "priority"]);
+    expect(inserts.every((c) => c[3] === "actor-1")).toBe(true);
+  });
+
+  it("does not record activity when no actor is given or the issue is missing", async () => {
+    const schema = await fresh();
+    queryRawUnsafe.mockResolvedValue([{ id: "i1" }]);
+    await updateIssue(schema, "i1", { status: "done" });
+
+    queryRawUnsafe.mockReset();
+    queryRawUnsafe.mockResolvedValue([]);
+    await updateIssue(schema, "gone", { status: "done" }, "actor-1");
+
+    expect(
+      executeRawUnsafe.mock.calls.some((c) => String(c[0]).includes('"activity"'))
+    ).toBe(false);
+  });
+
+  it("still succeeds when writing the activity row fails", async () => {
+    const schema = await fresh();
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    queryRawUnsafe
+      .mockResolvedValueOnce([{ id: "i1", status: "todo" }])
+      .mockResolvedValueOnce([{ id: "i1" }]);
+    executeRawUnsafe.mockRejectedValue(new Error("activity down"));
+
+    await expect(
+      updateIssue(schema, "i1", { status: "done" }, "actor-1")
+    ).resolves.toEqual({ id: "i1" });
+
+    spy.mockRestore();
+  });
+});
+
+describe("diffIssue", () => {
+  const before = {
+    id: "i1",
+    number: 1,
+    title: "T",
+    description: "d",
+    status: "todo",
+    priority: "medium",
+    due_date: "2027-01-01",
+    created_by: "u1",
+    assignee_id: "u2",
+  } as never;
+
+  it("ignores unchanged and omitted fields", () => {
+    expect(
+      diffIssue(before, { title: "T", status: "todo", dueDate: "2027-01-01" })
+    ).toEqual([]);
+  });
+
+  it("captures old and new values, including clearing a field", () => {
+    expect(diffIssue(before, { dueDate: null, assigneeId: null })).toEqual([
+      { kind: "changed", field: "due_date", oldValue: "2027-01-01", newValue: null },
+      { kind: "changed", field: "assignee_id", oldValue: "u2", newValue: null },
+    ]);
+  });
+
+  it("never stores description text", () => {
+    expect(diffIssue(before, { description: "secret new text" })).toEqual([
+      { kind: "changed", field: "description", oldValue: null, newValue: null },
+    ]);
+  });
+
+  it("clips very long titles", () => {
+    const [change] = diffIssue(before, { title: "x".repeat(500) });
+    expect(change.newValue!.length).toBeLessThanOrEqual(201);
   });
 });
 

@@ -159,7 +159,7 @@ describe("PATCH /api/projects/[slug]/issues/[issueId]", () => {
       priority: undefined,
       dueDate: undefined,
       assigneeId: undefined,
-    });
+    }, "user-1");
   });
 
   it("updates title, description, priority and due date together", async () => {
@@ -186,7 +186,7 @@ describe("PATCH /api/projects/[slug]/issues/[issueId]", () => {
       priority: "high",
       dueDate: "2027-01-15",
       assigneeId: undefined,
-    });
+    }, "user-1");
   });
 
   it("clears the due date, description and assignee when given empty/null values", async () => {
@@ -209,7 +209,7 @@ describe("PATCH /api/projects/[slug]/issues/[issueId]", () => {
       priority: undefined,
       dueDate: null,
       assigneeId: null,
-    });
+    }, "user-1");
   });
 
   it("assigns an issue to a project member", async () => {

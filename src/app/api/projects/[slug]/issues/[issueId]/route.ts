@@ -92,14 +92,19 @@ async function handlePATCH(
     );
   }
 
-  const issue = await updateIssue(project.schemaName, issueId, {
-    title,
-    description: description === undefined ? undefined : description || null,
-    status,
-    priority,
-    dueDate: dueDate === undefined ? undefined : dueDate || null,
-    assigneeId: normalizedAssignee,
-  });
+  const issue = await updateIssue(
+    project.schemaName,
+    issueId,
+    {
+      title,
+      description: description === undefined ? undefined : description || null,
+      status,
+      priority,
+      dueDate: dueDate === undefined ? undefined : dueDate || null,
+      assigneeId: normalizedAssignee,
+    },
+    session.user.id
+  );
 
   if (!issue) {
     return NextResponse.json({ error: "Issue not found" }, { status: 404 });

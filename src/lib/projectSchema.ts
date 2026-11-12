@@ -120,6 +120,57 @@ async function runEnsure(schemaName: string): Promise<void> {
   await prisma.$executeRawUnsafe(
     `CREATE INDEX IF NOT EXISTS comments_issue_id_idx ON "${schemaName}"."comments" (issue_id, created_at)`
   );
+
+  // One atomic block: a half-applied numbering upgrade would be skipped on
+  // retry because the column would already exist.
+  if (!columns.has("number")) {
+    await prisma.$executeRawUnsafe(`
+      DO $upgrade$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = '${schemaName}' AND table_name = 'issues' AND column_name = 'number'
+        ) THEN
+          CREATE SEQUENCE IF NOT EXISTS "${schemaName}"."issue_number_seq";
+          ALTER TABLE "${schemaName}"."issues" ADD COLUMN number INTEGER;
+          UPDATE "${schemaName}"."issues" i SET number = r.rn
+          FROM (
+            SELECT id, row_number() OVER (ORDER BY created_at, id) AS rn
+            FROM "${schemaName}"."issues"
+          ) r
+          WHERE i.id = r.id;
+          PERFORM setval(
+            '"${schemaName}"."issue_number_seq"',
+            COALESCE((SELECT MAX(number) FROM "${schemaName}"."issues"), 0) + 1,
+            false
+          );
+          ALTER TABLE "${schemaName}"."issues"
+            ALTER COLUMN number SET DEFAULT nextval('"${schemaName}"."issue_number_seq"');
+          ALTER TABLE "${schemaName}"."issues" ALTER COLUMN number SET NOT NULL;
+          CREATE UNIQUE INDEX IF NOT EXISTS issues_number_key
+            ON "${schemaName}"."issues" (number);
+        END IF;
+      END
+      $upgrade$
+    `);
+  }
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "${schemaName}"."activity" (
+      id TEXT PRIMARY KEY,
+      issue_id TEXT NOT NULL REFERENCES "${schemaName}"."issues"(id) ON DELETE CASCADE,
+      actor_id TEXT,
+      kind TEXT NOT NULL,
+      field TEXT,
+      old_value TEXT,
+      new_value TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS activity_issue_id_idx ON "${schemaName}"."activity" (issue_id, created_at)`
+  );
 }
 
 export async function provisionProjectSchema(schemaName: string): Promise<void> {
@@ -137,6 +188,7 @@ export async function dropProjectSchema(schemaName: string): Promise<void> {
 
 export interface Issue {
   id: string;
+  number: number;
   title: string;
   description: string | null;
   status: IssueStatus;
@@ -148,7 +200,7 @@ export interface Issue {
   updated_at: Date;
 }
 
-const ISSUE_COLUMNS = `id, title, description, status, priority,
+const ISSUE_COLUMNS = `id, number, title, description, status, priority,
   to_char(due_date, 'YYYY-MM-DD') AS due_date,
   created_by, assignee_id, created_at, updated_at`;
 
@@ -291,6 +343,10 @@ export async function createIssue(
     data.assigneeId ?? null
   );
 
+  await recordActivity(schemaName, [
+    { issueId: id, actorId: data.createdBy, kind: "created" },
+  ]);
+
   return rows[0];
 }
 
@@ -303,13 +359,121 @@ export interface IssuePatch {
   assigneeId?: string | null;
 }
 
+export interface ActivityEntry {
+  issueId: string;
+  actorId: string | null;
+  kind: "created" | "changed" | "commented";
+  field?: string;
+  oldValue?: string | null;
+  newValue?: string | null;
+}
+
+const ACTIVITY_VALUE_MAX = 200;
+
+function clip(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  return value.length > ACTIVITY_VALUE_MAX
+    ? `${value.slice(0, ACTIVITY_VALUE_MAX)}…`
+    : value;
+}
+
+export function diffIssue(
+  before: Issue,
+  patch: IssuePatch
+): Omit<ActivityEntry, "issueId" | "actorId">[] {
+  const changes: Omit<ActivityEntry, "issueId" | "actorId">[] = [];
+
+  function check(
+    field: string,
+    oldValue: string | null,
+    newValue: string | null | undefined,
+    hideValues = false
+  ) {
+    if (newValue === undefined || newValue === oldValue) return;
+
+    changes.push({
+      kind: "changed",
+      field,
+      oldValue: hideValues ? null : clip(oldValue),
+      newValue: hideValues ? null : clip(newValue),
+    });
+  }
+
+  check("title", before.title, patch.title);
+  check("description", before.description ?? null, patch.description, true);
+  check("status", before.status, patch.status);
+  check("priority", before.priority, patch.priority);
+  check("due_date", before.due_date, patch.dueDate);
+  check("assignee_id", before.assignee_id, patch.assigneeId);
+
+  return changes;
+}
+
+export async function recordActivity(
+  schemaName: string,
+  entries: ActivityEntry[]
+): Promise<void> {
+  assertValidSchemaName(schemaName);
+
+  // The audit trail must never block the action it describes.
+  try {
+    for (const entry of entries) {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "${schemaName}"."activity"
+           (id, issue_id, actor_id, kind, field, old_value, new_value)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        randomUUID(),
+        entry.issueId,
+        entry.actorId,
+        entry.kind,
+        entry.field ?? null,
+        entry.oldValue ?? null,
+        entry.newValue ?? null
+      );
+    }
+  } catch (error) {
+    console.error("Could not record issue activity", error);
+  }
+}
+
+export interface IssueActivity {
+  id: string;
+  issue_id: string;
+  actor_id: string | null;
+  kind: ActivityEntry["kind"];
+  field: string | null;
+  old_value: string | null;
+  new_value: string | null;
+  created_at: Date;
+}
+
+export async function listActivity(
+  schemaName: string,
+  issueId: string
+): Promise<IssueActivity[]> {
+  assertValidSchemaName(schemaName);
+  await ensureProjectSchema(schemaName);
+
+  return prisma.$queryRawUnsafe<IssueActivity[]>(
+    `SELECT id, issue_id, actor_id, kind, field, old_value, new_value, created_at
+     FROM "${schemaName}"."activity"
+     WHERE issue_id = $1
+     ORDER BY created_at DESC, id ASC
+     LIMIT 100`,
+    issueId
+  );
+}
+
 export async function updateIssue(
   schemaName: string,
   issueId: string,
-  patch: IssuePatch
+  patch: IssuePatch,
+  actorId?: string
 ): Promise<Issue | null> {
   assertValidSchemaName(schemaName);
   await ensureProjectSchema(schemaName);
+
+  const before = actorId ? await getIssue(schemaName, issueId) : null;
 
   const sets: string[] = [];
   const values: unknown[] = [];
@@ -339,6 +503,17 @@ export async function updateIssue(
      RETURNING ${ISSUE_COLUMNS}`,
     ...values
   );
+
+  if (before && actorId && rows[0]) {
+    await recordActivity(
+      schemaName,
+      diffIssue(before, patch).map((change) => ({
+        ...change,
+        issueId,
+        actorId,
+      }))
+    );
+  }
 
   return rows[0] ?? null;
 }
@@ -417,6 +592,12 @@ export async function addComment(
     data.authorId,
     data.body
   );
+
+  if (rows[0]) {
+    await recordActivity(schemaName, [
+      { issueId: data.issueId, actorId: data.authorId, kind: "commented" },
+    ]);
+  }
 
   return rows[0] ?? null;
 }

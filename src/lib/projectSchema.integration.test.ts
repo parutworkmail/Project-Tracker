@@ -8,6 +8,7 @@ import {
   dropProjectSchema,
   generateSchemaName,
   getIssue,
+  listActivity,
   listComments,
   provisionProjectSchema,
   searchIssues,
@@ -171,5 +172,79 @@ describe.skipIf(!enabled)("project schema (real database)", { timeout: 90_000 },
 
     await deleteIssue(schema, issue.id);
     expect(await listComments(schema, issue.id)).toEqual([]);
+  });
+
+  it("numbers issues sequentially and never reuses a deleted number", async () => {
+    const a = await createIssue(schema, { title: "Num A", createdBy: "u1" });
+    const b = await createIssue(schema, { title: "Num B", createdBy: "u1" });
+    expect(b.number).toBe(a.number + 1);
+
+    await deleteIssue(schema, b.id);
+    const c = await createIssue(schema, { title: "Num C", createdBy: "u1" });
+    expect(c.number).toBeGreaterThan(b.number);
+  });
+
+  it("records an activity trail for create, edits and comments", async () => {
+    const issue = await createIssue(schema, { title: "Tracked", createdBy: "u1" });
+
+    await updateIssue(
+      schema,
+      issue.id,
+      { status: "done", priority: "urgent", assigneeId: "u2", title: "Tracked" },
+      "u9"
+    );
+    await updateIssue(schema, issue.id, { status: "done" }, "u9");
+    await addComment(schema, { issueId: issue.id, authorId: "u3", body: "hi" });
+
+    const trail = await listActivity(schema, issue.id);
+    const summary = trail
+      .map((t) => `${t.kind}:${t.field ?? ""}:${t.actor_id}`)
+      .sort();
+
+    expect(summary).toEqual(
+      [
+        "created::u1",
+        "changed:status:u9",
+        "changed:priority:u9",
+        "changed:assignee_id:u9",
+        "commented::u3",
+      ].sort()
+    );
+    expect(trail.find((t) => t.field === "status")).toMatchObject({
+      old_value: "todo",
+      new_value: "done",
+    });
+
+    await deleteIssue(schema, issue.id);
+    expect(await listActivity(schema, issue.id)).toEqual([]);
+  });
+
+  it("backfills numbers on a legacy schema by age and keeps counting after", async () => {
+    const legacy = generateSchemaName();
+    await prisma.$executeRawUnsafe(`CREATE SCHEMA "${legacy}"`);
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE "${legacy}"."issues" (
+        id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT,
+        status TEXT NOT NULL DEFAULT 'todo' CHECK (status IN ('todo','in_progress','done')),
+        created_by TEXT NOT NULL, assignee_id TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "${legacy}"."issues" (id, title, created_by, created_at) VALUES
+         ('l2', 'Second', 'u1', '2026-02-01'),
+         ('l1', 'First', 'u1', '2026-01-01'),
+         ('l3', 'Third', 'u1', '2026-03-01')`
+    );
+
+    try {
+      expect((await getIssue(legacy, "l1"))?.number).toBe(1);
+      expect((await getIssue(legacy, "l2"))?.number).toBe(2);
+      expect((await getIssue(legacy, "l3"))?.number).toBe(3);
+
+      const fresh = await createIssue(legacy, { title: "Fresh", createdBy: "u1" });
+      expect(fresh.number).toBe(4);
+    } finally {
+      await dropProjectSchema(legacy);
+    }
   });
 });

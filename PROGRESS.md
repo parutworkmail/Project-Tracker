@@ -6,6 +6,74 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
+- **Plan (NEW DAY)**: User said it is a new day: tell the plan and continue.
+  Today: (1) verify the real state (git status, dev server, test DB), (2)
+  finish feature 1 (issue numbers + activity): run the untested `DO
+  $upgrade$` SQL on the LOCAL test DB only, add the missing integration
+  tests, fix bugs, (3) full validation, (4) local commit, NO push, (5) next
+  backlog features one at a time (labels, kanban, CSV export, stats, My
+  issues, notifications, subtasks). Supabase stays untouched until the SQL
+  is proven locally.
+- **Status**: step 1-4 DONE. I stopped the dev server on :3000 (it used
+  .env = Supabase and would have run the untested upgrade there). Local test
+  DB recreated (`node scripts/local-db.mjs start`). Feature 1 SQL is now
+  PROVEN on local Postgres 17: 9/9 real-DB integration tests pass (new:
+  sequential numbering without reuse, activity trail, legacy-schema backfill
+  by age + counting on). Full validation green: tsc clean, eslint 0 errors,
+  329 unit tests pass / 9 skipped, `npm run build` OK. Committed locally,
+  NOT pushed. Supabase NOT touched; the numbering/activity upgrade runs
+  lazily per project the first time its board is opened against Supabase.
+- **Next**: feature 2 (labels).
+
+- **Plan (NEW DAY, earlier note)**: (superseded by the status above)
+- **Plan (AUTONOMOUS LOOP, user AFK)**: commit+push of the day DONE (pushed
+  `6a9e432` to origin/main; push permission consumed). Loop = pick feature
+  -> research -> build -> light test (tsc + targeted vitest, local-DB e2e)
+  -> local commit -> next, until user stops me. Backlog (in order): (1)
+  issue keys + activity history, (2) labels, (3) kanban view with
+  drag-and-drop, (4) CSV export, (5) project stats panel, (6) "My issues"
+  across projects, (7) in-app notifications, (8) subtasks. Schema changes:
+  additive only, lazy per-project upgrade via ensureProjectSchema.
+- **Status (END OF DAY, loop STOPPED by user - "that's all for today")**:
+  Only feature 1 was started; it is NOT finished and NOT committed.
+  - Done today and pushed: everything up to `6a9e432` (full validation was
+    green: tsc clean, eslint 0 errors, 317 tests pass / 6 skipped, build OK).
+    The Supabase DB was never touched by this session's work.
+  - Feature 1 (issue numbers + activity history), UNCOMMITTED in the working
+    tree, written but only partly verified:
+    - `src/lib/projectSchema.ts`: `ensureProjectSchema` now adds an issue
+      `number` column (sequence, backfilled by age, unique) inside one
+      `DO $upgrade$` block, and a new `activity` table; new `diffIssue`,
+      `recordActivity` (never blocks the action; description text is not
+      stored), `listActivity`; `updateIssue(schema, id, patch, actorId?)`
+      logs changes; `createIssue`/`addComment` log "created"/"commented".
+    - `issues/[issueId]/route.ts` passes the actor id; `issueMeta.ts` has
+      `describeActivity`; new `components/issue-activity.tsx`; task page
+      shows `#number` and an Activity list; board table has a `#` column.
+    - Tests: `tsc` clean; unit tests pass (projectSchema.extra 26, issueMeta
+      5 new, issues routes 43). Full suite and build NOT re-run.
+  - NOT verified: the `DO $upgrade$` SQL has never run on any real Postgres.
+    The integration tests for numbering/activity were NOT added (my script
+    failed on a quoting error), so `projectSchema.integration.test.ts` is
+    unchanged. Test DB: I stopped an old throwaway Postgres on port 5544
+    (leftover of mine) and restarted it; at end of day something is
+    listening on 5544 (pid 35352, likely the fresh test DB) - check with
+    `node scripts/local-db.mjs env` before use. `next dev` is still running
+    on port 3000 (pid 5776).
+  - WARNING: if `next dev` (port 3000) is still running against Supabase,
+    opening any project board/task page runs the untested upgrade on that
+    project's schema in the real database. It is additive, but untested.
+    Stop the dev server, or point it at the local DB, before testing.
+  - Backlog not started: labels, kanban with drag-and-drop, CSV export,
+    project stats, "My issues", notifications, subtasks.
+  - Still open from earlier: 5 review findings (dialog focus trap/scroll
+    lock, live region + unsaved warning, GET /issues ignoring search params);
+    possible leftover `e2e_*` rows in Supabase (`node --env-file=.env
+    scripts/e2e-cleanup.mjs`); final code never run end to end on Supabase.
+- **Next (tomorrow)**: start the local test DB, add + run the integration
+  tests for feature 1, fix any SQL error, run full validation, then commit
+  locally. Do not push without a new explicit ask.
+
 - **Plan**: User approved today's work and said "commit and push" (this
   message). Run the full validation tier (tsc + lint + full tests + build),
   commit everything, push ONCE. Then user goes AFK 1-2 h and wants an

@@ -4,10 +4,11 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageProject, getAssignableUsers } from "@/lib/permissions";
-import { getIssue, listComments } from "@/lib/projectSchema";
-import { userLabel } from "@/lib/issueMeta";
+import { getIssue, listActivity, listComments } from "@/lib/projectSchema";
+import { describeActivity, userLabel } from "@/lib/issueMeta";
 import { IssueDetailForm } from "@/components/issue-detail-form";
 import { IssueComments } from "@/components/issue-comments";
+import { IssueActivity } from "@/components/issue-activity";
 import { LocalTime } from "@/components/local-time";
 import { ProjectNav } from "@/components/project-nav";
 
@@ -57,9 +58,10 @@ export default async function IssueDetailPage({
     notFound();
   }
 
-  const [comments, assignees] = await Promise.all([
+  const [comments, assignees, activity] = await Promise.all([
     listComments(project.schemaName, issueId),
     getAssignableUsers(project.id),
+    listActivity(project.schemaName, issueId),
   ]);
 
   const userIds = [
@@ -68,6 +70,10 @@ export default async function IssueDetailPage({
         issue.created_by,
         issue.assignee_id,
         ...comments.map((c) => c.author_id),
+        ...activity.flatMap((a) => [
+          a.actor_id,
+          ...(a.field === "assignee_id" ? [a.old_value, a.new_value] : []),
+        ]),
       ].filter((id): id is string => !!id)
     ),
   ];
@@ -96,7 +102,8 @@ export default async function IssueDetailPage({
         </Link>
 
         <p className="mb-6 text-xs text-zinc-500">
-          Created by {labels.get(issue.created_by) ?? "a former member"} on{" "}
+          <span className="font-semibold text-foreground">#{issue.number}</span>
+          {" · "}Created by {labels.get(issue.created_by) ?? "a former member"} on{" "}
           <LocalTime iso={new Date(issue.created_at).toISOString()} />
           {" · "}Updated <LocalTime iso={new Date(issue.updated_at).toISOString()} />
         </p>
@@ -133,6 +140,21 @@ export default async function IssueDetailPage({
               labels.get(comment.author_id) ?? "Former member",
             body: comment.body,
             createdAt: new Date(comment.created_at).toISOString(),
+          }))}
+        />
+
+        <hr className="my-8 border-black/[.08] dark:border-white/[.145]" />
+
+        <IssueActivity
+          items={activity.map((entry) => ({
+            id: entry.id,
+            actorLabel: entry.actor_id
+              ? (labels.get(entry.actor_id) ?? "Former member")
+              : "Someone",
+            text: describeActivity(entry, (userId) =>
+              userId ? (labels.get(userId) ?? "a former member") : "nobody"
+            ),
+            createdAt: new Date(entry.created_at).toISOString(),
           }))}
         />
       </main>
