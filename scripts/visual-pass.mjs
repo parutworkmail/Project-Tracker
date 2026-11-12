@@ -173,6 +173,26 @@ try {
   await new Promise((r) => setTimeout(r, 1500));
   const after2 = await api(`/api/projects/${slug}/issues`, "GET");
   console.log("select move:", after2.data.filter((i) => i.status === "in_progress").length >= 2 ? "PASS" : "FAIL");
+
+  const csv = await page.evaluate(async (url) => {
+    const res = await fetch(url);
+    return {
+      status: res.status,
+      type: res.headers.get("content-type"),
+      disposition: res.headers.get("content-disposition"),
+      text: await res.text(),
+    };
+  }, `/api/projects/${slug}/issues/export?label=${labelIds.Design}&sort=oldest`);
+  const csvLines = csv.text.split("\r\n").filter(Boolean);
+  const csvOk =
+    csv.status === 200 &&
+    csv.type.startsWith("text/csv") &&
+    /attachment; filename=".+\.csv"/.test(csv.disposition) &&
+    csvLines.length === 3 &&
+    csvLines[0].includes("Title") &&
+    csvLines[1].includes("Design new dashboard cards") &&
+    csvLines[1].includes("Design");
+  console.log("csv export (label filter):", csvOk ? "PASS" : "FAIL " + JSON.stringify(csvLines));
 } finally {
   await browser.close();
   if (slug) {

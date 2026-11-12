@@ -89,6 +89,13 @@ export default async function ProjectBoardPage({
                 userId={session.user.id}
               />
             )}
+            <a
+              href={`/api/projects/${project.slug}/issues/export${buildBoardQuery(filters, { page: 1, view: "list" })}`}
+              download
+              className="btn-secondary rounded-xl px-3 py-1.5 text-sm"
+            >
+              Export CSV
+            </a>
             <CreateIssueButton slug={project.slug} assignees={assignees} />
           </div>
         </div>

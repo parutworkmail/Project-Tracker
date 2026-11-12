@@ -56,7 +56,28 @@ Logging". Shows exactly what was happening if the last session crashed.)
   the status (PASS/PASS); light + dark screenshots checked and deleted.
   Supabase NOT touched. Not covered: real mouse/touch dragging on a phone
   (touch devices rely on the per-card select).
-- **Next**: feature 4 (CSV export).
+- **Plan (feature 4, CSV export)**: user asked "done or still todo?" ->
+  answered: not done, loop continues. Build `GET /api/projects/[slug]/issues/
+  export` returning a CSV download of the tasks matching the board filters
+  (q, status, priority, assignee, label, sort), paging through searchIssues
+  200 at a time up to 5000 rows. Columns: #, Title, Description, Status,
+  Priority, Due date, Assignee, Labels, Created by, Created at, Updated at.
+  Pure `src/lib/csv.ts` (RFC 4180 quoting, UTF-8 BOM for Excel, formula-
+  injection guard: cells starting with = + - @ tab CR get a leading '). Any
+  member with access may export; rate limited; "Export CSV" link on the
+  tasks page that carries the current filters. No schema change. Tests:
+  csv unit tests, route tests; light check only.
+- **Status**: DONE, committed locally (not pushed). `lib/csv.ts`, `GET
+  /api/projects/[slug]/issues/export` (filters honoured, 200/page up to
+  5000 rows, `X-Export-Truncated` header, rate limit 10/min, members only),
+  "Export CSV" secondary button on the tasks page. Verified: tsc clean,
+  eslint 0 errors, 376 unit tests pass / 11 skipped, build OK; in real
+  Chrome against the LOCAL DB the label-filtered download returned a CSV
+  attachment with exactly the 2 matching rows (PASS); light screenshot
+  checked and deleted. Supabase NOT touched. Not covered: opening the file
+  in Excel itself; the truncation notice is only a response header, the UI
+  does not warn when a project has more than 5000 matching tasks.
+- **Next**: feature 5 (project stats panel).
 
 - **Plan (feature 2, labels) [original plan, kept for reference]**: per-project labels (name <=30, 1 of 7 fixed
   colors, case-insensitive unique, max 30/project). Tables `labels` +
