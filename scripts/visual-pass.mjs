@@ -108,11 +108,21 @@ try {
   await api(`/api/projects/${slug}/issues/${issues[0].id}/comments`, "POST", { body: "Reproduced on Chrome and Firefox. Looks like the session cookie is read before it is written." });
   await api(`/api/projects/${slug}/issues/${issues[0].id}/comments`, "POST", { body: "Fix is in review." });
 
+  const labelIds = {};
+  for (const [name, color] of [["Bug", "red"], ["Design", "teal"], ["Docs", "blue"]]) {
+    const r = await api(`/api/projects/${slug}/labels`, "POST", { name, color });
+    labelIds[name] = r.data.id;
+  }
+  await api(`/api/projects/${slug}/issues/${issues[0].id}`, "PATCH", { labelIds: [labelIds.Bug] });
+  await api(`/api/projects/${slug}/issues/${issues[1].id}`, "PATCH", { labelIds: [labelIds.Design] });
+  await api(`/api/projects/${slug}/issues/${issues[2].id}`, "PATCH", { labelIds: [labelIds.Docs, labelIds.Design] });
+
   const shots = [
     ["dashboard", "/dashboard"],
     ["board", `/${slug}/board`],
     ["board-filtered", `/${slug}/board?status=in_progress&sort=priority`],
     ["board-empty-filter", `/${slug}/board?q=zzzz`],
+    ["board-label-filter", `/${slug}/board?label=${labelIds.Design}`],
     ["task", `/${slug}/board/${issues[0].id}`],
     ["settings", `/${slug}/settings`],
     ["admin", "/admin"],

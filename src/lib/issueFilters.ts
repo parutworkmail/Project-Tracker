@@ -13,6 +13,7 @@ export interface IssueFilterState {
   status: IssueStatus | "";
   priority: IssuePriority | "";
   assignee: string;
+  label: string;
   sort: IssueSort;
   page: number;
 }
@@ -38,6 +39,7 @@ export function parseIssueFilters(params: RawParams): IssueFilterState {
       ? (priority as IssuePriority)
       : "",
     assignee: first(params.assignee).slice(0, 64),
+    label: first(params.label).slice(0, 64),
     sort: SORTS.includes(sort as IssueSort) ? (sort as IssueSort) : "newest",
     page: Number.isFinite(page) && page > 1 ? Math.min(page, 1_000_000) : 1,
   };
@@ -54,6 +56,7 @@ export function buildBoardQuery(
   if (merged.status) query.set("status", merged.status);
   if (merged.priority) query.set("priority", merged.priority);
   if (merged.assignee) query.set("assignee", merged.assignee);
+  if (merged.label) query.set("label", merged.label);
   if (merged.sort !== "newest") query.set("sort", merged.sort);
   if (merged.page > 1) query.set("page", String(merged.page));
 
@@ -67,6 +70,7 @@ export function hasActiveFilters(filters: IssueFilterState): boolean {
       filters.status ||
       filters.priority ||
       filters.assignee ||
+      filters.label ||
       filters.sort !== "newest"
   );
 }

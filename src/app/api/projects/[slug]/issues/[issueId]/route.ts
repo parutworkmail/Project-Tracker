@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { updateIssue, deleteIssue } from "@/lib/projectSchema";
+import { updateIssue, deleteIssue, setIssueLabels } from "@/lib/projectSchema";
 import { updateIssueSchema } from "@/lib/validation/project";
 import {
   canAccessProject,
@@ -76,7 +76,7 @@ async function handlePATCH(
     );
   }
 
-  const { title, description, status, priority, dueDate, assigneeId } =
+  const { title, description, status, priority, dueDate, assigneeId, labelIds } =
     parsed.data;
 
   const normalizedAssignee =
@@ -90,6 +90,26 @@ async function handlePATCH(
       { error: "Assignee must be a member of this project." },
       { status: 400 }
     );
+  }
+
+  if (labelIds !== undefined) {
+    const outcome = await setIssueLabels(
+      project.schemaName,
+      issueId,
+      labelIds,
+      session.user.id
+    );
+
+    if (outcome === "not_found") {
+      return NextResponse.json({ error: "Issue not found" }, { status: 404 });
+    }
+
+    if (outcome === "unknown_label") {
+      return NextResponse.json(
+        { error: "One of the labels no longer exists." },
+        { status: 400 }
+      );
+    }
   }
 
   const issue = await updateIssue(

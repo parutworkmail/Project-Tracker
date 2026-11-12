@@ -39,6 +39,28 @@ export type AddProjectMemberInput = z.infer<typeof addProjectMemberSchema>;
 
 const ISSUE_STATUSES = ["todo", "in_progress", "done"] as const;
 const ISSUE_PRIORITIES = ["low", "medium", "high", "urgent"] as const;
+const LABEL_COLOR_VALUES = [
+  "gray",
+  "red",
+  "orange",
+  "yellow",
+  "green",
+  "teal",
+  "blue",
+] as const;
+
+export const createLabelSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Label name is required.")
+    .max(30, "Label name is too long (30 characters max)."),
+  color: z.enum(LABEL_COLOR_VALUES).default("gray"),
+});
+
+export type CreateLabelInput = z.infer<typeof createLabelSchema>;
+
+const labelIdsField = z.array(z.string().min(1).max(64)).max(20, "Too many labels.");
 
 const dueDateField = z
   .string()
@@ -56,6 +78,7 @@ export const createIssueSchema = z.object({
   priority: z.enum(ISSUE_PRIORITIES).optional(),
   dueDate: dueDateField.nullable().optional().or(z.literal("")),
   assigneeId: z.string().nullable().optional(),
+  labelIds: labelIdsField.optional(),
 });
 
 export type CreateIssueInput = z.infer<typeof createIssueSchema>;
@@ -74,6 +97,7 @@ export const updateIssueSchema = z
     priority: z.enum(ISSUE_PRIORITIES).optional(),
     dueDate: dueDateField.nullable().optional().or(z.literal("")),
     assigneeId: z.string().nullable().optional(),
+    labelIds: labelIdsField.optional(),
   })
   .refine((data) => Object.values(data).some((value) => value !== undefined), {
     message: "At least one field is required.",

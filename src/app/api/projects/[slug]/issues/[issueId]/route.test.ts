@@ -4,6 +4,7 @@ const {
   authMock,
   projectFindUnique,
   updateIssue,
+  setIssueLabels,
   deleteIssue,
   canAccessProject,
   canManageProject,
@@ -12,6 +13,7 @@ const {
   authMock: vi.fn(),
   projectFindUnique: vi.fn(),
   updateIssue: vi.fn(),
+  setIssueLabels: vi.fn(),
   deleteIssue: vi.fn(),
   canAccessProject: vi.fn(),
   canManageProject: vi.fn(),
@@ -37,7 +39,11 @@ vi.mock("@/lib/prisma", () => ({
   DbUnavailableError: class DbUnavailableError extends Error {},
 }));
 
-vi.mock("@/lib/projectSchema", () => ({ updateIssue, deleteIssue }));
+vi.mock("@/lib/projectSchema", () => ({
+  updateIssue,
+  deleteIssue,
+  setIssueLabels,
+}));
 
 vi.mock("@/lib/permissions", () => ({
   canAccessProject,
@@ -318,5 +324,70 @@ describe("DELETE /api/projects/[slug]/issues/[issueId]", () => {
 
     expect(response.status).toBe(200);
     expect(deleteIssue).toHaveBeenCalledWith("proj_abc", "i1");
+  });
+});
+
+describe("PATCH labels", () => {
+  function allow() {
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
+    projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(true);
+    updateIssue.mockResolvedValue({ id: "i1" });
+    setIssueLabels.mockReset();
+  }
+
+  it("sets labels before updating and attributes the change to the caller", async () => {
+    allow();
+    setIssueLabels.mockResolvedValue("ok");
+
+    const response = await PATCH(jsonRequest({ labelIds: ["l1", "l2"] }), params("x", "i1"));
+
+    expect(response.status).toBe(200);
+    expect(setIssueLabels).toHaveBeenCalledWith("proj_abc", "i1", ["l1", "l2"], "user-1");
+    expect(updateIssue).toHaveBeenCalled();
+  });
+
+  it("accepts an empty list to clear every label", async () => {
+    allow();
+    setIssueLabels.mockResolvedValue("ok");
+
+    expect((await PATCH(jsonRequest({ labelIds: [] }), params("x", "i1"))).status).toBe(200);
+    expect(setIssueLabels).toHaveBeenCalledWith("proj_abc", "i1", [], "user-1");
+  });
+
+  it("returns 400 for an unknown label and does not apply other edits", async () => {
+    allow();
+    setIssueLabels.mockResolvedValue("unknown_label");
+
+    const response = await PATCH(
+      jsonRequest({ title: "New", labelIds: ["ghost"] }),
+      params("x", "i1")
+    );
+
+    expect(response.status).toBe(400);
+    expect(updateIssue).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when the issue does not exist", async () => {
+    allow();
+    setIssueLabels.mockResolvedValue("not_found");
+
+    expect((await PATCH(jsonRequest({ labelIds: ["l1"] }), params("x", "gone"))).status).toBe(404);
+    expect(updateIssue).not.toHaveBeenCalled();
+  });
+
+  it("rejects a malformed labelIds payload", async () => {
+    allow();
+
+    expect((await PATCH(jsonRequest({ labelIds: "l1" }), params("x", "i1"))).status).toBe(400);
+    expect(setIssueLabels).not.toHaveBeenCalled();
+  });
+
+  it("does not touch labels when the field is omitted", async () => {
+    allow();
+
+    await PATCH(jsonRequest({ status: "done" }), params("x", "i1"));
+
+    expect(setIssueLabels).not.toHaveBeenCalled();
   });
 });

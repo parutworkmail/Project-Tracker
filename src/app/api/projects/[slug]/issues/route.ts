@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { createIssue, listIssues } from "@/lib/projectSchema";
+import { createIssue, listIssues, setIssueLabels } from "@/lib/projectSchema";
 import { createIssueSchema } from "@/lib/validation/project";
 import { canAccessProject, isAssignableUser } from "@/lib/permissions";
 import { withApiErrorHandling } from "@/lib/apiError";
@@ -127,6 +127,15 @@ async function handlePOST(
     dueDate: parsed.data.dueDate || null,
     assigneeId,
   });
+
+  if (parsed.data.labelIds?.length) {
+    await setIssueLabels(
+      project.schemaName,
+      issue.id,
+      parsed.data.labelIds,
+      session.user.id
+    );
+  }
 
   return NextResponse.json(issue, { status: 201 });
 }

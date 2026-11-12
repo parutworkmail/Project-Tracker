@@ -27,6 +27,7 @@ export async function IssueBoardSection({
     status: filters.status || undefined,
     priority: filters.priority || undefined,
     assignee: filters.assignee || undefined,
+    label: filters.label || undefined,
     sort: filters.sort,
     page: filters.page,
   });

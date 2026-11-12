@@ -13,6 +13,7 @@ describe("parseIssueFilters", () => {
       status: "",
       priority: "",
       assignee: "",
+      label: "",
       sort: "newest",
       page: 1,
     });
@@ -25,6 +26,7 @@ describe("parseIssueFilters", () => {
         status: "done",
         priority: "urgent",
         assignee: "u1",
+        label: "lab1",
         sort: "due",
         page: "3",
       })
@@ -33,6 +35,7 @@ describe("parseIssueFilters", () => {
       status: "done",
       priority: "urgent",
       assignee: "u1",
+      label: "lab1",
       sort: "due",
       page: 3,
     });
@@ -74,6 +77,12 @@ describe("buildBoardQuery", () => {
     const filters = parseIssueFilters({ status: "todo", page: "2" });
     expect(buildBoardQuery(filters, { page: 1, status: "" })).toBe("");
   });
+
+  it("round-trips the label filter", () => {
+    const filters = parseIssueFilters({ label: "abc" });
+    expect(buildBoardQuery(filters)).toBe("?label=abc");
+    expect(buildBoardQuery(filters, { label: "" })).toBe("");
+  });
 });
 
 describe("hasActiveFilters", () => {
@@ -81,5 +90,6 @@ describe("hasActiveFilters", () => {
     expect(hasActiveFilters(parseIssueFilters({ page: "4" }))).toBe(false);
     expect(hasActiveFilters(parseIssueFilters({ sort: "oldest" }))).toBe(true);
     expect(hasActiveFilters(parseIssueFilters({ q: "x" }))).toBe(true);
+    expect(hasActiveFilters(parseIssueFilters({ label: "x" }))).toBe(true);
   });
 });

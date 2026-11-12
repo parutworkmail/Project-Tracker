@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { PriorityBadge } from "@/components/issue-badges";
+import { LabelChip } from "@/components/label-chip";
 import { useToday } from "@/lib/useToday";
 import {
   ISSUE_STATUSES,
   STATUS_LABELS,
   formatDueDate,
   isOverdue,
+  type IssueLabelView,
   type IssuePriority,
   type IssueStatus,
 } from "@/lib/issueMeta";
@@ -23,6 +25,7 @@ interface Issue {
   priority: IssuePriority;
   due_date: string | null;
   assignee_id: string | null;
+  labels: IssueLabelView[];
 }
 
 export function IssueTable({
@@ -180,6 +183,13 @@ export function IssueTable({
                     >
                       {issue.title}
                     </Link>
+                    {issue.labels.length > 0 && (
+                      <span className="mt-1 flex flex-wrap gap-1">
+                        {issue.labels.map((label) => (
+                          <LabelChip key={label.id} label={label} />
+                        ))}
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-2">
                     <select

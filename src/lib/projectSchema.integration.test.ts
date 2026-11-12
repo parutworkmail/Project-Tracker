@@ -3,15 +3,20 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   addComment,
   createIssue,
+  createLabel,
   deleteComment,
   deleteIssue,
+  deleteLabel,
   dropProjectSchema,
   generateSchemaName,
   getIssue,
   listActivity,
   listComments,
+  listLabels,
+  MAX_LABELS,
   provisionProjectSchema,
   searchIssues,
+  setIssueLabels,
   updateIssue,
 } from "./projectSchema";
 import { prisma } from "./prisma";
@@ -217,6 +222,84 @@ describe.skipIf(!enabled)("project schema (real database)", { timeout: 90_000 },
 
     await deleteIssue(schema, issue.id);
     expect(await listActivity(schema, issue.id)).toEqual([]);
+  });
+
+  it("manages labels: unique names, tagging, filtering, activity and cascade", async () => {
+    const bug = await createLabel(schema, { name: "Bug", color: "red" });
+    if (!("label" in bug)) throw new Error("expected label");
+
+    expect(await createLabel(schema, { name: "bug", color: "blue" })).toEqual({
+      error: "exists",
+    });
+
+    const ui = await createLabel(schema, { name: "UI", color: "teal" });
+    if (!("label" in ui)) throw new Error("expected label");
+
+    expect((await listLabels(schema)).map((l) => l.name)).toEqual(["Bug", "UI"]);
+
+    const tagged = await createIssue(schema, { title: "Tagged", createdBy: "u1" });
+    const other = await createIssue(schema, { title: "Untagged", createdBy: "u1" });
+
+    expect(Array.isArray(tagged.labels)).toBe(true);
+    expect(tagged.labels).toEqual([]);
+
+    expect(
+      await setIssueLabels(schema, tagged.id, [bug.label.id, ui.label.id], "u7")
+    ).toBe("ok");
+
+    const reloaded = await getIssue(schema, tagged.id);
+    expect(reloaded?.labels).toEqual([
+      { id: bug.label.id, name: "Bug", color: "red" },
+      { id: ui.label.id, name: "UI", color: "teal" },
+    ]);
+
+    const filtered = await searchIssues(schema, { label: bug.label.id });
+    expect(filtered.issues.map((i) => i.id)).toEqual([tagged.id]);
+    expect(filtered.total).toBe(1);
+    expect((await searchIssues(schema, { label: "nope" })).total).toBe(0);
+    expect(
+      (await searchIssues(schema)).issues.find((i) => i.id === other.id)?.labels
+    ).toEqual([]);
+
+    expect(await setIssueLabels(schema, tagged.id, [ui.label.id], "u7")).toBe("ok");
+    expect((await getIssue(schema, tagged.id))?.labels.map((l) => l.name)).toEqual(["UI"]);
+
+    expect(await setIssueLabels(schema, tagged.id, ["ghost"], "u7")).toBe("unknown_label");
+    expect(await setIssueLabels(schema, "missing", [], "u7")).toBe("not_found");
+
+    const trail = (await listActivity(schema, tagged.id))
+      .filter((a) => a.field === "label")
+      .map((a) => `${a.old_value ?? ""}>${a.new_value ?? ""}`)
+      .sort();
+    expect(trail).toEqual([">Bug", ">UI", "Bug>"].sort());
+
+    const renamed = await updateIssue(schema, tagged.id, { title: "Renamed" }, "u7");
+    expect(renamed?.labels).toHaveLength(1);
+
+    expect(await deleteLabel(schema, ui.label.id)).toMatchObject({ name: "UI" });
+    expect((await getIssue(schema, tagged.id))?.labels).toEqual([]);
+    expect(await deleteLabel(schema, ui.label.id)).toBeNull();
+
+    await deleteIssue(schema, tagged.id);
+    await deleteLabel(schema, bug.label.id);
+  });
+
+  it("enforces the per-project label limit", async () => {
+    const limitSchema = generateSchemaName();
+    await provisionProjectSchema(limitSchema);
+
+    try {
+      for (let i = 0; i < MAX_LABELS; i++) {
+        const made = await createLabel(limitSchema, { name: `L${i}`, color: "gray" });
+        expect("label" in made).toBe(true);
+      }
+
+      expect(
+        await createLabel(limitSchema, { name: "One too many", color: "gray" })
+      ).toEqual({ error: "limit" });
+    } finally {
+      await dropProjectSchema(limitSchema);
+    }
   });
 
   it("backfills numbers on a legacy schema by age and keeps counting after", async () => {

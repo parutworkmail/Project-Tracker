@@ -3,12 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { LabelChip } from "@/components/label-chip";
+import { LabelCreateForm } from "@/components/label-create-form";
 import {
   ISSUE_PRIORITY_LIST,
   ISSUE_STATUSES,
   PRIORITY_LABELS,
   STATUS_LABELS,
   userLabel,
+  type IssueLabelView,
   type IssuePriority,
   type IssueStatus,
 } from "@/lib/issueMeta";
@@ -27,6 +30,7 @@ interface IssueValues {
   priority: IssuePriority;
   due_date: string | null;
   assignee_id: string | null;
+  labelIds: string[];
 }
 
 const FIELD =
@@ -36,12 +40,14 @@ export function IssueDetailForm({
   slug,
   issue,
   assignees,
+  projectLabels,
   formerAssigneeLabel,
   canManage,
 }: {
   slug: string;
   issue: IssueValues;
   assignees: Assignee[];
+  projectLabels: IssueLabelView[];
   formerAssigneeLabel: string | null;
   canManage: boolean;
 }) {
@@ -52,6 +58,8 @@ export function IssueDetailForm({
   const [priority, setPriority] = useState<IssuePriority>(issue.priority);
   const [dueDate, setDueDate] = useState(issue.due_date ?? "");
   const [assigneeId, setAssigneeId] = useState(issue.assignee_id ?? "");
+  const [labelIds, setLabelIds] = useState<string[]>(issue.labelIds);
+  const [availableLabels, setAvailableLabels] = useState(projectLabels);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{
     kind: "ok" | "error";
@@ -65,7 +73,19 @@ export function IssueDetailForm({
     };
   }
 
+  const labelsChanged =
+    labelIds.length !== issue.labelIds.length ||
+    labelIds.some((id) => !issue.labelIds.includes(id));
+
+  function toggleLabel(id: string) {
+    setMessage(null);
+    setLabelIds((prev) =>
+      prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id]
+    );
+  }
+
   const isDirty =
+    labelsChanged ||
     title.trim() !== issue.title ||
     description !== (issue.description ?? "") ||
     status !== issue.status ||
@@ -89,6 +109,7 @@ export function IssueDetailForm({
     if (priority !== issue.priority) changes.priority = priority;
     if (dueDate !== (issue.due_date ?? "")) changes.dueDate = dueDate;
     if (assigneeId !== (issue.assignee_id ?? "")) changes.assigneeId = assigneeId || null;
+    if (labelsChanged) changes.labelIds = labelIds;
 
     setSaving(true);
 
@@ -274,6 +295,45 @@ export function IssueDetailForm({
           </div>
         </div>
       </div>
+
+      <fieldset className="flex flex-col gap-2">
+        <legend className="text-sm font-medium">Labels</legend>
+        {availableLabels.length === 0 ? (
+          <p className="text-sm text-zinc-500">
+            This project has no labels yet. Create the first one below.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {availableLabels.map((label) => {
+              const selected = labelIds.includes(label.id);
+
+              return (
+                <button
+                  key={label.id}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => toggleLabel(label.id)}
+                  className={`rounded-full ${
+                    selected
+                      ? "ring-2 ring-foreground ring-offset-2 ring-offset-[var(--background)]"
+                      : "opacity-60 hover:opacity-100"
+                  }`}
+                >
+                  <LabelChip label={label} />
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <LabelCreateForm
+          slug={slug}
+          onCreated={(label) => {
+            setAvailableLabels((prev) => [...prev, label]);
+            setLabelIds((prev) => [...prev, label.id]);
+            setMessage(null);
+          }}
+        />
+      </fieldset>
 
       <div className="flex flex-wrap items-center gap-3">
         <button

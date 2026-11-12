@@ -2,6 +2,51 @@ export type IssueStatus = "todo" | "in_progress" | "done";
 export type IssuePriority = "low" | "medium" | "high" | "urgent";
 export type IssueSort = "newest" | "oldest" | "updated" | "priority" | "due";
 
+export type LabelColor =
+  | "gray"
+  | "red"
+  | "orange"
+  | "yellow"
+  | "green"
+  | "teal"
+  | "blue";
+
+export interface IssueLabelView {
+  id: string;
+  name: string;
+  color: LabelColor;
+}
+
+export const LABEL_COLOR_LIST: LabelColor[] = [
+  "gray",
+  "red",
+  "orange",
+  "yellow",
+  "green",
+  "teal",
+  "blue",
+];
+
+export const LABEL_STYLES: Record<LabelColor, string> = {
+  gray: "bg-stone-200 text-stone-800 dark:bg-stone-700 dark:text-stone-100",
+  red: "bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-100",
+  orange: "bg-orange-100 text-orange-800 dark:bg-orange-900/60 dark:text-orange-100",
+  yellow: "bg-yellow-200 text-yellow-950 dark:bg-yellow-400/25 dark:text-yellow-100",
+  green: "bg-green-100 text-green-800 dark:bg-green-900/60 dark:text-green-100",
+  teal: "bg-teal-100 text-teal-800 dark:bg-teal-900/60 dark:text-teal-100",
+  blue: "bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-100",
+};
+
+export const LABEL_DOT_STYLES: Record<LabelColor, string> = {
+  gray: "bg-stone-500",
+  red: "bg-red-500",
+  orange: "bg-orange-500",
+  yellow: "bg-yellow-400",
+  green: "bg-green-500",
+  teal: "bg-teal-500",
+  blue: "bg-blue-500",
+};
+
 export const ISSUE_STATUSES: IssueStatus[] = ["todo", "in_progress", "done"];
 export const ISSUE_PRIORITY_LIST: IssuePriority[] = [
   "low",
@@ -122,6 +167,8 @@ export function describeActivity(
       if (!to) return "cleared the due date";
       if (!from) return `set the due date to ${formatDueDate(to)}`;
       return `changed the due date from ${formatDueDate(from)} to ${formatDueDate(to)}`;
+    case "label":
+      return to ? `added the label "${to}"` : `removed the label "${from ?? ""}"`;
     case "assignee_id":
       if (!to) return `unassigned ${nameOf(from)}`;
       if (!from) return `assigned this to ${nameOf(to)}`;

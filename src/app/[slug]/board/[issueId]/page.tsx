@@ -4,7 +4,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageProject, getAssignableUsers } from "@/lib/permissions";
-import { getIssue, listActivity, listComments } from "@/lib/projectSchema";
+import { getIssue, listActivity, listComments, listLabels } from "@/lib/projectSchema";
 import { describeActivity, userLabel } from "@/lib/issueMeta";
 import { IssueDetailForm } from "@/components/issue-detail-form";
 import { IssueComments } from "@/components/issue-comments";
@@ -58,10 +58,11 @@ export default async function IssueDetailPage({
     notFound();
   }
 
-  const [comments, assignees, activity] = await Promise.all([
+  const [comments, assignees, activity, projectLabels] = await Promise.all([
     listComments(project.schemaName, issueId),
     getAssignableUsers(project.id),
     listActivity(project.schemaName, issueId),
+    listLabels(project.schemaName),
   ]);
 
   const userIds = [
@@ -118,8 +119,10 @@ export default async function IssueDetailPage({
             priority: issue.priority,
             due_date: issue.due_date,
             assignee_id: issue.assignee_id,
+            labelIds: issue.labels.map((label) => label.id),
           }}
           assignees={assignees}
+          projectLabels={projectLabels}
           formerAssigneeLabel={
             issue.assignee_id ? (labels.get(issue.assignee_id) ?? null) : null
           }

@@ -50,3 +50,10 @@ describe("describeActivity", () => {
     expect(describeActivity(entry("weird", null, null), nameOf)).toBe("updated the task");
   });
 });
+
+describe("describeActivity labels", () => {
+  it("describes adding and removing a label", () => {
+    expect(describeActivity(entry("label", null, "Bug"), nameOf)).toBe('added the label "Bug"');
+    expect(describeActivity(entry("label", "Bug", null), nameOf)).toBe('removed the label "Bug"');
+  });
+});

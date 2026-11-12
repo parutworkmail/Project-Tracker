@@ -25,6 +25,30 @@ Logging". Shows exactly what was happening if the last session crashed.)
   lazily per project the first time its board is opened against Supabase.
 - **Next**: feature 2 (labels).
 
+- **Status**: DONE, committed locally (not pushed). Labels: tables
+  `labels` + `issue_labels` (lazy per-project upgrade), `Issue.labels`
+  (json_agg), `?label=` board filter, chips on the board, picker + inline
+  create on the task page, label manager (create/delete) in Settings,
+  "added/removed the label" in Activity. API: GET/POST `/labels`, DELETE
+  `/labels/[labelId]` (managers only), `labelIds` on issue PATCH/POST.
+  Verified: tsc clean, eslint 0 errors, 359 unit tests pass / 11 skipped,
+  build OK, 11/11 real-DB integration tests on LOCAL Postgres 17, and
+  light/dark screenshots (board, task page, label filter, settings) from a
+  dev server on the local DB (screenshots deleted, demo data cleaned).
+  Supabase NOT touched. Stopped a stale `next start -p 3400` of mine.
+  Not done: label picker in the "Create task" dialog; ask-before-delete uses
+  window.confirm like the rest of the app.
+- **Next**: feature 3 (kanban board with drag-and-drop).
+
+- **Plan (feature 2, labels) [original plan, kept for reference]**: per-project labels (name <=30, 1 of 7 fixed
+  colors, case-insensitive unique, max 30/project). Tables `labels` +
+  `issue_labels` added lazily in `ensureProjectSchema`. Any member can
+  create labels and tag/untag tasks; only managers delete labels (settings
+  page). Issues carry `labels` (json_agg), board filter `?label=<id>`,
+  chips in the board table, label picker on the task page, activity entry
+  for add/remove. API: GET/POST `/labels`, DELETE `/labels/[labelId]`,
+  `labelIds` on issue PATCH/POST. Test on LOCAL DB only; commit locally.
+
 - **Plan (NEW DAY, earlier note)**: (superseded by the status above)
 - **Plan (AUTONOMOUS LOOP, user AFK)**: commit+push of the day DONE (pushed
   `6a9e432` to origin/main; push permission consumed). Loop = pick feature

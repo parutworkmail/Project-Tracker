@@ -150,3 +150,19 @@ describe('createCommentSchema', () => {
     expect(createCommentSchema.safeParse({ body: 'a'.repeat(2001) }).success).toBe(false);
   });
 });
+
+describe("label validation", () => {
+  it("trims names, defaults the color and rejects bad input", async () => {
+    const { createLabelSchema, updateIssueSchema, createIssueSchema } = await import("./project");
+
+    expect(createLabelSchema.parse({ name: "  Bug  " })).toEqual({ name: "Bug", color: "gray" });
+    expect(createLabelSchema.safeParse({ name: "   " }).success).toBe(false);
+    expect(createLabelSchema.safeParse({ name: "x".repeat(31) }).success).toBe(false);
+    expect(createLabelSchema.safeParse({ name: "ok", color: "purple" }).success).toBe(false);
+
+    expect(updateIssueSchema.safeParse({ labelIds: [] }).success).toBe(true);
+    expect(updateIssueSchema.safeParse({ labelIds: [1] }).success).toBe(false);
+    expect(updateIssueSchema.safeParse({ labelIds: Array(21).fill("a") }).success).toBe(false);
+    expect(createIssueSchema.safeParse({ title: "t", labelIds: ["a"] }).success).toBe(true);
+  });
+});

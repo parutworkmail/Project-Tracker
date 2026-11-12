@@ -6,6 +6,8 @@ import { canManageProject } from "@/lib/permissions";
 import { ProjectManageControls } from "@/components/project-manage-controls";
 import { ProjectMemberManager } from "@/components/project-member-manager";
 import { ProjectNav } from "@/components/project-nav";
+import { ProjectLabelManager } from "@/components/project-label-manager";
+import { listLabels } from "@/lib/projectSchema";
 
 export const instant = false;
 
@@ -50,6 +52,8 @@ export default async function ProjectSettingsPage({
     redirect(`/${project.slug}/board`);
   }
 
+  const labels = await listLabels(project.schemaName);
+
   return (
     <div className="flex flex-1 flex-col">
       <ProjectNav
@@ -65,6 +69,11 @@ export default async function ProjectSettingsPage({
             Name &amp; shareable link
           </h2>
           <ProjectManageControls slug={project.slug} name={project.name} />
+        </section>
+
+        <section className="mb-8">
+          <h2 className="mb-3 text-sm font-medium text-zinc-500">Labels</h2>
+          <ProjectLabelManager slug={project.slug} labels={labels} />
         </section>
 
         <section>

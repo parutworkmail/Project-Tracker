@@ -10,6 +10,7 @@ import { LeaveProjectButton } from "@/components/leave-project-button";
 import { JoinProjectButton } from "@/components/join-project-button";
 import { CreateIssueButton } from "@/components/create-issue-button";
 import { IssueBoardSection } from "@/components/issue-board-section";
+import { listLabels } from "@/lib/projectSchema";
 import { ProjectNav } from "@/components/project-nav";
 import { BackLink } from "@/components/back-link";
 
@@ -63,7 +64,10 @@ export default async function ProjectBoardPage({
     );
   }
 
-  const assignees = await getAssignableUsers(project.id);
+  const [assignees, labels] = await Promise.all([
+    getAssignableUsers(project.id),
+    listLabels(project.schemaName),
+  ]);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -89,7 +93,12 @@ export default async function ProjectBoardPage({
           </div>
         </div>
 
-        <IssueFilters slug={project.slug} filters={filters} assignees={assignees} />
+        <IssueFilters
+          slug={project.slug}
+          filters={filters}
+          assignees={assignees}
+          labels={labels}
+        />
 
         <Suspense
           key={buildBoardQuery(filters)}

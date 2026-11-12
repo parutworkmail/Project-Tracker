@@ -14,7 +14,9 @@ vi.mock("@/lib/prisma", () => ({
 
 import {
   addComment,
+  createLabel,
   deleteComment,
+  deleteLabel,
   diffIssue,
   ensureProjectSchema,
   generateSchemaName,
@@ -22,7 +24,9 @@ import {
   getIssue,
   ISSUES_PAGE_SIZE,
   listComments,
+  MAX_LABELS,
   searchIssues,
+  setIssueLabels,
   updateIssue,
 } from "./projectSchema";
 
@@ -81,7 +85,7 @@ describe("ensureProjectSchema", () => {
       executeRawUnsafe.mock.calls.filter((c) =>
         String(c[0]).includes("CREATE TABLE IF NOT EXISTS")
       ).length
-    ).toBe(3);
+    ).toBe(5);
   });
 
   it("skips ALTER when the columns already exist", async () => {
@@ -126,7 +130,7 @@ describe("searchIssues", () => {
       page: 1,
       pageSize: ISSUES_PAGE_SIZE,
     });
-    expect(queryRawUnsafe.mock.calls[0][0]).not.toContain("WHERE");
+    expect(queryRawUnsafe.mock.calls[0][0]).not.toMatch(/"issues"\s+WHERE/);
     expect(queryRawUnsafe.mock.calls[0][0]).toContain("ORDER BY created_at DESC");
   });
 
@@ -380,5 +384,124 @@ describe("comments", () => {
       expect.stringContaining("DELETE FROM"),
       "c1"
     );
+  });
+});
+
+describe("labels", () => {
+  it("filters issues by label with a bound parameter", async () => {
+    const schema = await fresh();
+    queryRawUnsafe.mockResolvedValue([{ count: 0 }]);
+
+    await searchIssues(schema, { label: "lab-1" });
+
+    const [sql, ...values] = queryRawUnsafe.mock.calls[0];
+    expect(sql).toContain("issue_labels");
+    expect(sql).toContain("fl.label_id = $1");
+    expect(values).toEqual(["lab-1"]);
+  });
+
+  it("creates a label when under the limit", async () => {
+    const schema = await fresh();
+    queryRawUnsafe
+      .mockResolvedValueOnce([{ count: BigInt(2) }])
+      .mockResolvedValueOnce([{ id: "l1", name: "Bug", color: "red" }]);
+
+    expect(await createLabel(schema, { name: "Bug", color: "red" })).toEqual({
+      label: { id: "l1", name: "Bug", color: "red" },
+    });
+    expect(queryRawUnsafe.mock.calls[1][0]).toContain("ON CONFLICT DO NOTHING");
+  });
+
+  it("refuses to exceed the label limit without inserting", async () => {
+    const schema = await fresh();
+    queryRawUnsafe.mockResolvedValueOnce([{ count: MAX_LABELS }]);
+
+    expect(await createLabel(schema, { name: "More", color: "blue" })).toEqual({
+      error: "limit",
+    });
+    expect(queryRawUnsafe).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a duplicate name as exists", async () => {
+    const schema = await fresh();
+    queryRawUnsafe
+      .mockResolvedValueOnce([{ count: 1 }])
+      .mockResolvedValueOnce([]);
+
+    expect(await createLabel(schema, { name: "bug", color: "red" })).toEqual({
+      error: "exists",
+    });
+  });
+
+  it("deletes a label and returns null when it is missing", async () => {
+    const schema = await fresh();
+    queryRawUnsafe.mockResolvedValueOnce([{ id: "l1" }]);
+    expect(await deleteLabel(schema, "l1")).toEqual({ id: "l1" });
+
+    queryRawUnsafe.mockResolvedValueOnce([]);
+    expect(await deleteLabel(schema, "nope")).toBeNull();
+  });
+
+  it("returns not_found for a missing issue and unknown_label for a missing label", async () => {
+    const schema = await fresh();
+
+    queryRawUnsafe.mockResolvedValueOnce([]);
+    expect(await setIssueLabels(schema, "gone", ["l1"], "u1")).toBe("not_found");
+
+    queryRawUnsafe
+      .mockResolvedValueOnce([{ id: "i1" }])
+      .mockResolvedValueOnce([]);
+    expect(await setIssueLabels(schema, "i1", ["ghost"], "u1")).toBe(
+      "unknown_label"
+    );
+    expect(
+      executeRawUnsafe.mock.calls.some((c) => String(c[0]).includes('"issue_labels"'))
+    ).toBe(false);
+  });
+
+  it("adds and removes only the difference and logs each change", async () => {
+    const schema = await fresh();
+    queryRawUnsafe
+      .mockResolvedValueOnce([{ id: "i1" }])
+      .mockResolvedValueOnce([
+        { id: "keep", name: "Keep" },
+        { id: "new", name: "New" },
+      ])
+      .mockResolvedValueOnce([
+        { id: "keep", name: "Keep" },
+        { id: "old", name: "Old" },
+      ]);
+
+    expect(await setIssueLabels(schema, "i1", ["keep", "new", "keep"], "u1")).toBe("ok");
+
+    const writes = executeRawUnsafe.mock.calls.map((c) => String(c[0]));
+    expect(writes.some((s) => s.includes("DELETE FROM") && s.includes("issue_labels"))).toBe(true);
+    expect(writes.some((s) => s.includes("INSERT INTO") && s.includes("issue_labels"))).toBe(true);
+
+    const del = executeRawUnsafe.mock.calls.find((c) => String(c[0]).includes("DELETE FROM"));
+    expect(del?.[2]).toEqual(["old"]);
+    const ins = executeRawUnsafe.mock.calls.find(
+      (c) => String(c[0]).includes("INSERT INTO") && String(c[0]).includes("issue_labels")
+    );
+    expect(ins?.[2]).toEqual(["new"]);
+
+    const activity = executeRawUnsafe.mock.calls.filter((c) =>
+      String(c[0]).includes('"activity"')
+    );
+    expect(activity.map((c) => [c[5], c[6], c[7]])).toEqual([
+      ["label", null, "New"],
+      ["label", "Old", null],
+    ]);
+  });
+
+  it("does nothing when the label set is unchanged", async () => {
+    const schema = await fresh();
+    queryRawUnsafe
+      .mockResolvedValueOnce([{ id: "i1" }])
+      .mockResolvedValueOnce([{ id: "a", name: "A" }])
+      .mockResolvedValueOnce([{ id: "a", name: "A" }]);
+
+    expect(await setIssueLabels(schema, "i1", ["a"], "u1")).toBe("ok");
+    expect(executeRawUnsafe).not.toHaveBeenCalled();
   });
 });

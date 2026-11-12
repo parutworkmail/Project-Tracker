@@ -10,6 +10,7 @@ import {
   SORT_LABELS,
   STATUS_LABELS,
   userLabel,
+  type IssueLabelView,
   type IssueSort,
 } from "@/lib/issueMeta";
 import {
@@ -31,10 +32,12 @@ export function IssueFilters({
   slug,
   filters,
   assignees,
+  labels,
 }: {
   slug: string;
   filters: IssueFilterState;
   assignees: Assignee[];
+  labels: IssueLabelView[];
 }) {
   const router = useRouter();
   const [search, setSearch] = useState(filters.q);
@@ -130,6 +133,25 @@ export function IssueFilters({
           </option>
         ))}
       </select>
+
+      {labels.length > 0 && (
+        <select
+          aria-label="Filter by label"
+          value={filters.label}
+          onChange={(e) => navigate({ label: e.target.value })}
+          className={CONTROL}
+        >
+          <option value="">All labels</option>
+          {filters.label && !labels.some((label) => label.id === filters.label) && (
+            <option value={filters.label}>Deleted label</option>
+          )}
+          {labels.map((label) => (
+            <option key={label.id} value={label.id}>
+              {label.name}
+            </option>
+          ))}
+        </select>
+      )}
 
       <select
         aria-label="Sort tasks"

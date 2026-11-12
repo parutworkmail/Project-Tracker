@@ -20,6 +20,24 @@ export type IssueSort = (typeof ISSUE_SORTS)[number];
 
 export const ISSUES_PAGE_SIZE = 25;
 
+export const LABEL_COLORS = [
+  "gray",
+  "red",
+  "orange",
+  "yellow",
+  "green",
+  "teal",
+  "blue",
+] as const;
+export type LabelColor = (typeof LABEL_COLORS)[number];
+export const MAX_LABELS = 30;
+
+export interface IssueLabel {
+  id: string;
+  name: string;
+  color: LabelColor;
+}
+
 export function generateSchemaName(): string {
   return `proj_${randomUUID().replace(/-/g, "")}`;
 }
@@ -171,6 +189,33 @@ async function runEnsure(schemaName: string): Promise<void> {
   await prisma.$executeRawUnsafe(
     `CREATE INDEX IF NOT EXISTS activity_issue_id_idx ON "${schemaName}"."activity" (issue_id, created_at)`
   );
+
+  const colorList = LABEL_COLORS.map((color) => `'${color}'`).join(", ");
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "${schemaName}"."labels" (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      color TEXT NOT NULL DEFAULT 'gray' CHECK (color IN (${colorList})),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  await prisma.$executeRawUnsafe(
+    `CREATE UNIQUE INDEX IF NOT EXISTS labels_name_key ON "${schemaName}"."labels" (lower(name))`
+  );
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "${schemaName}"."issue_labels" (
+      issue_id TEXT NOT NULL REFERENCES "${schemaName}"."issues"(id) ON DELETE CASCADE,
+      label_id TEXT NOT NULL REFERENCES "${schemaName}"."labels"(id) ON DELETE CASCADE,
+      PRIMARY KEY (issue_id, label_id)
+    )
+  `);
+
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS issue_labels_label_idx ON "${schemaName}"."issue_labels" (label_id)`
+  );
 }
 
 export async function provisionProjectSchema(schemaName: string): Promise<void> {
@@ -198,18 +243,27 @@ export interface Issue {
   assignee_id: string | null;
   created_at: Date;
   updated_at: Date;
+  labels: IssueLabel[];
 }
 
-const ISSUE_COLUMNS = `id, number, title, description, status, priority,
+function issueColumns(schemaName: string): string {
+  return `id, number, title, description, status, priority,
   to_char(due_date, 'YYYY-MM-DD') AS due_date,
-  created_by, assignee_id, created_at, updated_at`;
+  created_by, assignee_id, created_at, updated_at,
+  COALESCE((
+    SELECT json_agg(json_build_object('id', l.id, 'name', l.name, 'color', l.color) ORDER BY lower(l.name))
+    FROM "${schemaName}"."issue_labels" il
+    JOIN "${schemaName}"."labels" l ON l.id = il.label_id
+    WHERE il.issue_id = issues.id
+  ), '[]'::json) AS labels`;
+}
 
 export async function listIssues(schemaName: string): Promise<Issue[]> {
   assertValidSchemaName(schemaName);
   await ensureProjectSchema(schemaName);
 
   return prisma.$queryRawUnsafe<Issue[]>(
-    `SELECT ${ISSUE_COLUMNS} FROM "${schemaName}"."issues" ORDER BY created_at DESC`
+    `SELECT ${issueColumns(schemaName)} FROM "${schemaName}"."issues" ORDER BY created_at DESC`
   );
 }
 
@@ -218,6 +272,7 @@ export interface IssueSearchOptions {
   status?: IssueStatus;
   priority?: IssuePriority;
   assignee?: string;
+  label?: string;
   sort?: IssueSort;
   page?: number;
 }
@@ -264,6 +319,13 @@ export async function searchIssues(
     conditions.push(`assignee_id = $${values.length}`);
   }
 
+  if (options.label) {
+    values.push(options.label);
+    conditions.push(
+      `EXISTS (SELECT 1 FROM "${schemaName}"."issue_labels" fl WHERE fl.issue_id = issues.id AND fl.label_id = $${values.length})`
+    );
+  }
+
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const sort =
     options.sort && Object.hasOwn(ORDER_BY, options.sort)
@@ -278,7 +340,7 @@ export async function searchIssues(
 
   const [issues, countRows] = await Promise.all([
     prisma.$queryRawUnsafe<Issue[]>(
-      `SELECT ${ISSUE_COLUMNS} FROM "${schemaName}"."issues"
+      `SELECT ${issueColumns(schemaName)} FROM "${schemaName}"."issues"
        ${where}
        ORDER BY ${orderBy}
        LIMIT ${ISSUES_PAGE_SIZE} OFFSET ${offset}`,
@@ -306,7 +368,7 @@ export async function getIssue(
   await ensureProjectSchema(schemaName);
 
   const rows = await prisma.$queryRawUnsafe<Issue[]>(
-    `SELECT ${ISSUE_COLUMNS} FROM "${schemaName}"."issues" WHERE id = $1`,
+    `SELECT ${issueColumns(schemaName)} FROM "${schemaName}"."issues" WHERE id = $1`,
     issueId
   );
 
@@ -333,7 +395,7 @@ export async function createIssue(
     `INSERT INTO "${schemaName}"."issues"
        (id, title, description, created_by, priority, due_date, assignee_id)
      VALUES ($1, $2, $3, $4, $5, $6::date, $7)
-     RETURNING ${ISSUE_COLUMNS}`,
+     RETURNING ${issueColumns(schemaName)}`,
     id,
     data.title,
     data.description ?? null,
@@ -500,7 +562,7 @@ export async function updateIssue(
     `UPDATE "${schemaName}"."issues"
      SET ${sets.join(", ")}, updated_at = now()
      WHERE id = $${values.length}
-     RETURNING ${ISSUE_COLUMNS}`,
+     RETURNING ${issueColumns(schemaName)}`,
     ...values
   );
 
@@ -550,6 +612,138 @@ export async function unassignUserIssues(
      WHERE assignee_id = $1`,
     userId
   );
+}
+
+export async function listLabels(schemaName: string): Promise<IssueLabel[]> {
+  assertValidSchemaName(schemaName);
+  await ensureProjectSchema(schemaName);
+
+  return prisma.$queryRawUnsafe<IssueLabel[]>(
+    `SELECT id, name, color FROM "${schemaName}"."labels" ORDER BY lower(name) ASC`
+  );
+}
+
+export async function createLabel(
+  schemaName: string,
+  data: { name: string; color: LabelColor }
+): Promise<{ label: IssueLabel } | { error: "exists" | "limit" }> {
+  assertValidSchemaName(schemaName);
+  await ensureProjectSchema(schemaName);
+
+  const countRows = await prisma.$queryRawUnsafe<{ count: bigint | number | string }[]>(
+    `SELECT COUNT(*) AS count FROM "${schemaName}"."labels"`
+  );
+
+  if (Number(countRows[0]?.count ?? 0) >= MAX_LABELS) {
+    return { error: "limit" };
+  }
+
+  const rows = await prisma.$queryRawUnsafe<IssueLabel[]>(
+    `INSERT INTO "${schemaName}"."labels" (id, name, color)
+     VALUES ($1, $2, $3)
+     ON CONFLICT DO NOTHING
+     RETURNING id, name, color`,
+    randomUUID(),
+    data.name,
+    data.color
+  );
+
+  return rows[0] ? { label: rows[0] } : { error: "exists" };
+}
+
+export async function deleteLabel(
+  schemaName: string,
+  labelId: string
+): Promise<IssueLabel | null> {
+  assertValidSchemaName(schemaName);
+  await ensureProjectSchema(schemaName);
+
+  const rows = await prisma.$queryRawUnsafe<IssueLabel[]>(
+    `DELETE FROM "${schemaName}"."labels" WHERE id = $1 RETURNING id, name, color`,
+    labelId
+  );
+
+  return rows[0] ?? null;
+}
+
+export async function setIssueLabels(
+  schemaName: string,
+  issueId: string,
+  labelIds: string[],
+  actorId: string
+): Promise<"ok" | "not_found" | "unknown_label"> {
+  assertValidSchemaName(schemaName);
+  await ensureProjectSchema(schemaName);
+
+  const wantedIds = [...new Set(labelIds)];
+
+  const exists = await prisma.$queryRawUnsafe<{ id: string }[]>(
+    `SELECT id FROM "${schemaName}"."issues" WHERE id = $1`,
+    issueId
+  );
+
+  if (!exists[0]) return "not_found";
+
+  const wanted = wantedIds.length
+    ? await prisma.$queryRawUnsafe<{ id: string; name: string }[]>(
+        `SELECT id, name FROM "${schemaName}"."labels" WHERE id = ANY($1::text[])`,
+        wantedIds
+      )
+    : [];
+
+  if (wanted.length !== wantedIds.length) return "unknown_label";
+
+  const current = await prisma.$queryRawUnsafe<{ id: string; name: string }[]>(
+    `SELECT l.id, l.name FROM "${schemaName}"."issue_labels" il
+     JOIN "${schemaName}"."labels" l ON l.id = il.label_id
+     WHERE il.issue_id = $1`,
+    issueId
+  );
+
+  const currentIds = new Set(current.map((label) => label.id));
+  const wantedSet = new Set(wantedIds);
+  const added = wanted.filter((label) => !currentIds.has(label.id));
+  const removed = current.filter((label) => !wantedSet.has(label.id));
+
+  if (removed.length) {
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM "${schemaName}"."issue_labels"
+       WHERE issue_id = $1 AND label_id = ANY($2::text[])`,
+      issueId,
+      removed.map((label) => label.id)
+    );
+  }
+
+  if (added.length) {
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "${schemaName}"."issue_labels" (issue_id, label_id)
+       SELECT $1, id FROM "${schemaName}"."labels" WHERE id = ANY($2::text[])
+       ON CONFLICT DO NOTHING`,
+      issueId,
+      added.map((label) => label.id)
+    );
+  }
+
+  await recordActivity(schemaName, [
+    ...added.map((label) => ({
+      issueId,
+      actorId,
+      kind: "changed" as const,
+      field: "label",
+      oldValue: null,
+      newValue: label.name,
+    })),
+    ...removed.map((label) => ({
+      issueId,
+      actorId,
+      kind: "changed" as const,
+      field: "label",
+      oldValue: label.name,
+      newValue: null,
+    })),
+  ]);
+
+  return "ok";
 }
 
 export interface IssueComment {
