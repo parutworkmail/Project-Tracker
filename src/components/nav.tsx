@@ -63,6 +63,12 @@ export function Nav() {
           <ThemeToggle />
           {status === "authenticated" ? (
             <>
+              <Link
+                href="/my-tasks"
+                className="rounded-lg px-3 py-1.5 text-muted hover:bg-accent/12 hover:text-foreground"
+              >
+                My tasks
+              </Link>
               {session.user?.role === "SUPER_ADMIN" && (
                 <>
                   <Link

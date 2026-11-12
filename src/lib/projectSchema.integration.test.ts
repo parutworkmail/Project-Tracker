@@ -10,9 +10,11 @@ import {
   dropProjectSchema,
   generateSchemaName,
   getIssue,
+  getProjectStats,
   listActivity,
   listComments,
   listLabels,
+  listOpenIssuesAssignedTo,
   MAX_LABELS,
   provisionProjectSchema,
   searchIssues,
@@ -282,6 +284,63 @@ describe.skipIf(!enabled)("project schema (real database)", { timeout: 90_000 },
 
     await deleteIssue(schema, tagged.id);
     await deleteLabel(schema, bug.label.id);
+  });
+
+  it("lists only the user's open tasks, soonest due first", async () => {
+    const mine = generateSchemaName();
+    await provisionProjectSchema(mine);
+
+    try {
+      const later = await createIssue(mine, { title: "later", createdBy: "u1", assigneeId: "me", dueDate: "2999-01-01" });
+      const sooner = await createIssue(mine, { title: "sooner", createdBy: "u1", assigneeId: "me", dueDate: "2030-01-01" });
+      const nodate = await createIssue(mine, { title: "no date", createdBy: "u1", assigneeId: "me" });
+      const finished = await createIssue(mine, { title: "finished", createdBy: "u1", assigneeId: "me" });
+      await createIssue(mine, { title: "someone else", createdBy: "u1", assigneeId: "other" });
+      await createIssue(mine, { title: "unassigned", createdBy: "u1" });
+      await updateIssue(mine, finished.id, { status: "done" });
+
+      const rows = await listOpenIssuesAssignedTo(mine, "me");
+
+      expect(rows.map((r) => r.title)).toEqual(["sooner", "later", "no date"]);
+      expect(rows[0].labels).toEqual([]);
+      expect(rows[0].number).toBe(sooner.number);
+      expect([later.id, nodate.id]).toContain(rows[1].id);
+      expect(await listOpenIssuesAssignedTo(mine, "nobody")).toEqual([]);
+    } finally {
+      await dropProjectSchema(mine);
+    }
+  });
+
+  it("computes project stats in one query", async () => {
+    const statsSchema = generateSchemaName();
+    await provisionProjectSchema(statsSchema);
+
+    try {
+      expect(await getProjectStats(statsSchema)).toEqual({
+        total: 0, todo: 0, inProgress: 0, done: 0, overdue: 0, unassigned: 0,
+      });
+
+      const past = "2020-01-01";
+      const future = "2999-01-01";
+      const a = await createIssue(statsSchema, { title: "overdue open", createdBy: "u1", dueDate: past });
+      const b = await createIssue(statsSchema, { title: "overdue but done", createdBy: "u1", dueDate: past, assigneeId: "u2" });
+      await createIssue(statsSchema, { title: "future", createdBy: "u1", dueDate: future, assigneeId: "u2" });
+      const d = await createIssue(statsSchema, { title: "doing", createdBy: "u1", assigneeId: "u3" });
+      await updateIssue(statsSchema, b.id, { status: "done" });
+      await updateIssue(statsSchema, d.id, { status: "in_progress" });
+
+      expect(a.status).toBe("todo");
+      expect(await getProjectStats(statsSchema)).toEqual({
+        total: 4,
+        todo: 2,
+        inProgress: 1,
+        done: 1,
+        overdue: 1,
+        unassigned: 1,
+      });
+    } finally {
+      await dropProjectSchema(statsSchema);
+    }
   });
 
   it("enforces the per-project label limit", async () => {

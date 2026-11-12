@@ -503,6 +503,84 @@ export async function recordActivity(
   }
 }
 
+export interface ProjectStats {
+  total: number;
+  todo: number;
+  inProgress: number;
+  done: number;
+  overdue: number;
+  unassigned: number;
+}
+
+export async function getProjectStats(schemaName: string): Promise<ProjectStats> {
+  assertValidSchemaName(schemaName);
+  await ensureProjectSchema(schemaName);
+
+  const rows = await prisma.$queryRawUnsafe<
+    Record<keyof ProjectStats, bigint | number | string | null>[]
+  >(
+    `SELECT
+       COUNT(*) AS total,
+       COUNT(*) FILTER (WHERE status = 'todo') AS "todo",
+       COUNT(*) FILTER (WHERE status = 'in_progress') AS "inProgress",
+       COUNT(*) FILTER (WHERE status = 'done') AS "done",
+       COUNT(*) FILTER (WHERE status <> 'done' AND due_date < CURRENT_DATE) AS "overdue",
+       COUNT(*) FILTER (WHERE status <> 'done' AND assignee_id IS NULL) AS "unassigned"
+     FROM "${schemaName}"."issues"`
+  );
+
+  const row = rows[0];
+  const num = (value: bigint | number | string | null | undefined) =>
+    Number(value ?? 0);
+
+  return {
+    total: num(row?.total),
+    todo: num(row?.todo),
+    inProgress: num(row?.inProgress),
+    done: num(row?.done),
+    overdue: num(row?.overdue),
+    unassigned: num(row?.unassigned),
+  };
+}
+
+export interface AssignedIssue {
+  id: string;
+  number: number;
+  title: string;
+  status: IssueStatus;
+  priority: IssuePriority;
+  due_date: string | null;
+  labels: IssueLabel[];
+}
+
+export const MY_TASKS_PER_PROJECT = 50;
+
+export async function listOpenIssuesAssignedTo(
+  schemaName: string,
+  userId: string
+): Promise<AssignedIssue[]> {
+  assertValidSchemaName(schemaName);
+  await ensureProjectSchema(schemaName);
+
+  return prisma.$queryRawUnsafe<AssignedIssue[]>(
+    `SELECT id, number, title, status, priority,
+       to_char(due_date, 'YYYY-MM-DD') AS due_date,
+       COALESCE((
+         SELECT json_agg(json_build_object('id', l.id, 'name', l.name, 'color', l.color) ORDER BY lower(l.name))
+         FROM "${schemaName}"."issue_labels" il
+         JOIN "${schemaName}"."labels" l ON l.id = il.label_id
+         WHERE il.issue_id = issues.id
+       ), '[]'::json) AS labels
+     FROM "${schemaName}"."issues"
+     WHERE assignee_id = $1 AND status <> 'done'
+     ORDER BY due_date ASC NULLS LAST,
+       CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END ASC,
+       number ASC
+     LIMIT ${MY_TASKS_PER_PROJECT}`,
+    userId
+  );
+}
+
 export interface IssueActivity {
   id: string;
   issue_id: string;

@@ -79,6 +79,32 @@ Logging". Shows exactly what was happening if the last session crashed.)
   does not warn when a project has more than 5000 matching tasks.
 - **Next**: feature 5 (project stats panel).
 
+- **Plan (features 5 + 6, then STOP for user testing)**: user said "go ahead,
+  after these todos end, clear out, I'll try". (5) Stats strip on the tasks
+  page: total, to do / in progress / done, overdue, unassigned, completion %,
+  from ONE SQL query getProjectStats (no schema change). (6) "My tasks" page
+  /my-tasks for any signed-in user: open tasks assigned to them across the
+  projects they can access, grouped by project, overdue first; link in the
+  main nav. Then full validation, local commit (no push), clear the todo
+  list, write a ready-to-test note. NOT starting notifications/subtasks/
+  review findings until the user is back.
+- **Status**: DONE, committed locally (not pushed); loop PAUSED for user testing.
+  Feature 5: stats strip on the tasks page (total / to do / in progress /
+  done / overdue / unassigned + completion bar) from one SQL query
+  (getProjectStats), loaded in its own Suspense. Feature 6: /my-tasks (open
+  tasks assigned to you across your projects, soonest due first, grouped by
+  project; one broken project shows a warning instead of hiding the rest)
+  with a My tasks link in the nav for every signed-in user; reserved slugs
+  my-tasks (and join) now tested. Verified: tsc clean, eslint 0 errors, 384
+  unit tests pass / 13 skipped, build OK, 13/13 real-DB integration tests on
+  LOCAL Postgres 17 (stats counts, my-tasks ordering), light+dark
+  screenshots checked then deleted. Supabase NOT touched. Known limits:
+  Overdue in the stats strip and My tasks uses the SERVER date (the board
+  list uses the browser date), so near midnight they can differ by a day;
+  My tasks shows max 50 tasks per project and max 50 projects.
+  NOT started: notifications, subtasks, the 5 open review findings.
+- **Next**: user tests; then continue the backlog if told to.
+
 - **Plan (feature 2, labels) [original plan, kept for reference]**: per-project labels (name <=30, 1 of 7 fixed
   colors, case-insensitive unique, max 30/project). Tables `labels` +
   `issue_labels` added lazily in `ensureProjectSchema`. Any member can

@@ -31,6 +31,7 @@ export const RESERVED_SLUGS = new Set([
   "dashboard",
   "login",
   "join",
+  "my-tasks",
   "change-password",
   "api",
   "project",

@@ -22,6 +22,7 @@ import {
   generateSchemaName,
   getComment,
   getIssue,
+  getProjectStats,
   ISSUES_PAGE_SIZE,
   listComments,
   MAX_LABELS,
@@ -524,5 +525,55 @@ describe("searchIssues page size", () => {
 
     const junk = await searchIssues(schema, { pageSize: Number.NaN });
     expect(junk.pageSize).toBe(ISSUES_PAGE_SIZE);
+  });
+});
+
+describe("getProjectStats", () => {
+  it("maps the single aggregate row to numbers (bigint safe)", async () => {
+    const schema = await fresh();
+    queryRawUnsafe.mockResolvedValue([
+      { total: BigInt(10), todo: BigInt(4), inProgress: 3, done: "3", overdue: BigInt(2), unassigned: 1 },
+    ]);
+
+    expect(await getProjectStats(schema)).toEqual({
+      total: 10,
+      todo: 4,
+      inProgress: 3,
+      done: 3,
+      overdue: 2,
+      unassigned: 1,
+    });
+    expect(queryRawUnsafe).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns zeros when the query yields nothing", async () => {
+    const schema = await fresh();
+    queryRawUnsafe.mockResolvedValue([]);
+
+    expect(await getProjectStats(schema)).toEqual({
+      total: 0, todo: 0, inProgress: 0, done: 0, overdue: 0, unassigned: 0,
+    });
+  });
+});
+
+describe("listOpenIssuesAssignedTo", () => {
+  it("filters by assignee and open status with bound parameters and a cap", async () => {
+    const { listOpenIssuesAssignedTo, MY_TASKS_PER_PROJECT } = await import("./projectSchema");
+    const schema = await fresh();
+    queryRawUnsafe.mockResolvedValue([{ id: "i1" }]);
+
+    expect(await listOpenIssuesAssignedTo(schema, "user-7")).toEqual([{ id: "i1" }]);
+
+    const [sql, ...values] = queryRawUnsafe.mock.calls[0];
+    expect(sql).toContain("assignee_id = $1");
+    expect(sql).toContain("status <> 'done'");
+    expect(sql).toContain(`LIMIT ${MY_TASKS_PER_PROJECT}`);
+    expect(values).toEqual(["user-7"]);
+  });
+
+  it("rejects an invalid schema name without querying", async () => {
+    const { listOpenIssuesAssignedTo } = await import("./projectSchema");
+    await expect(listOpenIssuesAssignedTo("bad", "u")).rejects.toThrow(/Invalid schema name/);
+    expect(queryRawUnsafe).not.toHaveBeenCalled();
   });
 });

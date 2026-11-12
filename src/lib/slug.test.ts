@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildUniqueSlug, randomSuffix, slugify } from "./slug";
+import { buildUniqueSlug, isReservedSlug, randomSuffix, slugify } from "./slug";
 
 describe("slugify", () => {
   it("lowercases and hyphenates", () => {
@@ -52,5 +52,18 @@ describe("buildUniqueSlug", () => {
     const a = buildUniqueSlug("Same Name");
     const b = buildUniqueSlug("Same Name");
     expect(a).not.toBe(b);
+  });
+});
+
+describe("isReservedSlug", () => {
+  it("blocks every top-level app route, case-insensitively", () => {
+    for (const slug of ["admin", "dashboard", "login", "join", "my-tasks", "api", "MY-TASKS", "Join"]) {
+      expect(isReservedSlug(slug)).toBe(true);
+    }
+  });
+
+  it("allows ordinary project slugs", () => {
+    expect(isReservedSlug("website-redesign-k3q9bk")).toBe(false);
+    expect(isReservedSlug("my-tasks-2")).toBe(false);
   });
 });

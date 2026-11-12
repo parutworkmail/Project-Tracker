@@ -10,6 +10,10 @@ import { LeaveProjectButton } from "@/components/leave-project-button";
 import { JoinProjectButton } from "@/components/join-project-button";
 import { CreateIssueButton } from "@/components/create-issue-button";
 import { IssueBoardSection } from "@/components/issue-board-section";
+import {
+  ProjectStatsSection,
+  ProjectStatsSkeleton,
+} from "@/components/project-stats-section";
 import { listLabels } from "@/lib/projectSchema";
 import { ProjectNav } from "@/components/project-nav";
 import { BackLink } from "@/components/back-link";
@@ -99,6 +103,10 @@ export default async function ProjectBoardPage({
             <CreateIssueButton slug={project.slug} assignees={assignees} />
           </div>
         </div>
+
+        <Suspense fallback={<ProjectStatsSkeleton />}>
+          <ProjectStatsSection schemaName={project.schemaName} />
+        </Suspense>
 
         <IssueFilters
           slug={project.slug}

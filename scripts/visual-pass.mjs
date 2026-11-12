@@ -119,6 +119,7 @@ try {
 
   const shots = [
     ["dashboard", "/dashboard"],
+    ["my-tasks", "/my-tasks"],
     ["board", `/${slug}/board`],
     ["board-filtered", `/${slug}/board?status=in_progress&sort=priority`],
     ["board-empty-filter", `/${slug}/board?q=zzzz`],
