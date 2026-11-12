@@ -16,6 +16,7 @@ describe("parseIssueFilters", () => {
       label: "",
       sort: "newest",
       page: 1,
+      view: "list",
     });
   });
 
@@ -38,6 +39,7 @@ describe("parseIssueFilters", () => {
       label: "lab1",
       sort: "due",
       page: 3,
+      view: "list",
     });
   });
 
@@ -91,5 +93,20 @@ describe("hasActiveFilters", () => {
     expect(hasActiveFilters(parseIssueFilters({ sort: "oldest" }))).toBe(true);
     expect(hasActiveFilters(parseIssueFilters({ q: "x" }))).toBe(true);
     expect(hasActiveFilters(parseIssueFilters({ label: "x" }))).toBe(true);
+  });
+});
+
+describe("board view", () => {
+  it("defaults to the list and accepts only 'board'", () => {
+    expect(parseIssueFilters({}).view).toBe("list");
+    expect(parseIssueFilters({ view: "board" }).view).toBe("board");
+    expect(parseIssueFilters({ view: "grid" }).view).toBe("list");
+  });
+
+  it("keeps the view in the query only for the board and never counts as a filter", () => {
+    const board = parseIssueFilters({ view: "board" });
+    expect(buildBoardQuery(board)).toBe("?view=board");
+    expect(buildBoardQuery(board, { view: "list" })).toBe("");
+    expect(hasActiveFilters(board)).toBe(false);
   });
 });

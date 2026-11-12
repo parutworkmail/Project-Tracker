@@ -38,7 +38,25 @@ Logging". Shows exactly what was happening if the last session crashed.)
   Supabase NOT touched. Stopped a stale `next start -p 3400` of mine.
   Not done: label picker in the "Create task" dialog; ask-before-delete uses
   window.confirm like the rest of the app.
-- **Next**: feature 3 (kanban board with drag-and-drop).
+- **Plan (feature 3, kanban)**: `?view=board` on the tasks page shows 3
+  columns (To do / In progress / Done) of cards (#, title, labels,
+  priority, assignee, due). Drag a card to another column = PATCH status
+  (optimistic, reverts on error); each card also has a "Move to" select for
+  keyboard/touch users. Uses the same filters except status; loads up to
+  100 tasks (`pageSize` option on searchIssues, capped 200) with a note
+  when more exist. List/Board toggle in the filter bar. No new
+  dependencies (HTML5 drag events). No schema change.
+- **Status**: DONE, committed locally (not pushed). Kanban: `components/
+  kanban-board.tsx`, List/Board toggle in the filter bar (status filter is
+  hidden in board view), `view` in `issueFilters.ts`, `pageSize` option on
+  `searchIssues` (default 25, cap 200; board loads 100 + a "showing first N
+  of M" note). Verified: tsc clean, eslint 0 errors, 362 unit tests pass /
+  11 skipped, build OK; in a real Chrome against the LOCAL DB a simulated
+  HTML5 drag-and-drop to Done and the per-card "Move" select both changed
+  the status (PASS/PASS); light + dark screenshots checked and deleted.
+  Supabase NOT touched. Not covered: real mouse/touch dragging on a phone
+  (touch devices rely on the per-card select).
+- **Next**: feature 4 (CSV export).
 
 - **Plan (feature 2, labels) [original plan, kept for reference]**: per-project labels (name <=30, 1 of 7 fixed
   colors, case-insensitive unique, max 30/project). Tables `labels` +

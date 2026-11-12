@@ -16,6 +16,7 @@ import {
 import {
   buildBoardQuery,
   hasActiveFilters,
+  parseIssueFilters,
   type IssueFilterState,
 } from "@/lib/issueFilters";
 
@@ -73,6 +74,28 @@ export function IssueFilters({
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div
+        role="group"
+        aria-label="Task view"
+        className="flex overflow-hidden rounded border border-black/[.08] dark:border-white/[.145]"
+      >
+        {(["list", "board"] as const).map((view) => (
+          <button
+            key={view}
+            type="button"
+            aria-pressed={filters.view === view}
+            onClick={() => navigate({ view })}
+            className={`px-3 py-1.5 text-sm ${
+              filters.view === view
+                ? "bg-accent font-semibold text-on-accent"
+                : "bg-surface text-muted hover:text-foreground"
+            }`}
+          >
+            {view === "list" ? "List" : "Board"}
+          </button>
+        ))}
+      </div>
+
       <input
         type="search"
         value={search}
@@ -82,21 +105,23 @@ export function IssueFilters({
         className={`${CONTROL} min-w-48 flex-1`}
       />
 
-      <select
-        aria-label="Filter by status"
-        value={filters.status}
-        onChange={(e) =>
-          navigate({ status: e.target.value as IssueFilterState["status"] })
-        }
-        className={CONTROL}
-      >
-        <option value="">All statuses</option>
-        {ISSUE_STATUSES.map((status) => (
-          <option key={status} value={status}>
-            {STATUS_LABELS[status]}
-          </option>
-        ))}
-      </select>
+      {filters.view === "list" && (
+        <select
+          aria-label="Filter by status"
+          value={filters.status}
+          onChange={(e) =>
+            navigate({ status: e.target.value as IssueFilterState["status"] })
+          }
+          className={CONTROL}
+        >
+          <option value="">All statuses</option>
+          {ISSUE_STATUSES.map((status) => (
+            <option key={status} value={status}>
+              {STATUS_LABELS[status]}
+            </option>
+          ))}
+        </select>
+      )}
 
       <select
         aria-label="Filter by priority"
@@ -172,7 +197,12 @@ export function IssueFilters({
           onClick={() => {
             setSearch("");
             setLastPushed("");
-            router.push(`/${slug}/board`);
+            router.push(
+              `/${slug}/board${buildBoardQuery(
+                parseIssueFilters({}),
+                { view: filters.view }
+              )}`
+            );
           }}
           className="text-sm text-zinc-500 hover:underline"
         >

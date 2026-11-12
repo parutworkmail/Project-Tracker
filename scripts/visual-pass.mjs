@@ -122,6 +122,8 @@ try {
     ["board", `/${slug}/board`],
     ["board-filtered", `/${slug}/board?status=in_progress&sort=priority`],
     ["board-empty-filter", `/${slug}/board?q=zzzz`],
+    ["kanban", `/${slug}/board?view=board`],
+    ["kanban-label-filter", `/${slug}/board?view=board&label=${labelIds.Design}`],
     ["board-label-filter", `/${slug}/board?label=${labelIds.Design}`],
     ["task", `/${slug}/board/${issues[0].id}`],
     ["settings", `/${slug}/settings`],
@@ -147,6 +149,30 @@ try {
     await page.screenshot({ path: `${outDir}/auth-create-dialog-${theme}.png` });
     console.log("shots done:", theme);
   }
+
+  await page.emulateMediaFeatures([{ name: "prefers-color-scheme", value: "light" }]);
+  await page.goto(base + `/${slug}/board?view=board`, { waitUntil: "networkidle0" });
+  await page.evaluate(() => {
+    const card = [...document.querySelectorAll('li[draggable="true"]')].find((el) =>
+      el.textContent.includes("Upgrade dependencies")
+    );
+    const column = document.querySelector('section[aria-label="Done column"]');
+    const transfer = new DataTransfer();
+    card.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: transfer }));
+    column.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    column.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+  });
+  await new Promise((r) => setTimeout(r, 1500));
+  const after = await api(`/api/projects/${slug}/issues`, "GET");
+  const moved = after.data.find((i) => i.title === "Upgrade dependencies");
+  console.log("drag-and-drop to Done:", moved.status === "done" ? "PASS" : "FAIL (" + moved.status + ")");
+
+  await page.goto(base + `/${slug}/board?view=board`, { waitUntil: "networkidle0" });
+  const select = await page.$('li[draggable="true"] select');
+  await select.select("in_progress");
+  await new Promise((r) => setTimeout(r, 1500));
+  const after2 = await api(`/api/projects/${slug}/issues`, "GET");
+  console.log("select move:", after2.data.filter((i) => i.status === "in_progress").length >= 2 ? "PASS" : "FAIL");
 } finally {
   await browser.close();
   if (slug) {

@@ -505,3 +505,24 @@ describe("labels", () => {
     expect(executeRawUnsafe).not.toHaveBeenCalled();
   });
 });
+
+describe("searchIssues page size", () => {
+  it("uses a custom page size and clamps it", async () => {
+    const schema = await fresh();
+    queryRawUnsafe.mockResolvedValue([{ count: 0 }]);
+
+    const board = await searchIssues(schema, { pageSize: 100 });
+    expect(board.pageSize).toBe(100);
+    expect(queryRawUnsafe.mock.calls[0][0]).toContain("LIMIT 100 OFFSET 0");
+
+    queryRawUnsafe.mockClear();
+    const huge = await searchIssues(schema, { pageSize: 99999 });
+    expect(huge.pageSize).toBe(200);
+
+    const tiny = await searchIssues(schema, { pageSize: -5 });
+    expect(tiny.pageSize).toBe(1);
+
+    const junk = await searchIssues(schema, { pageSize: Number.NaN });
+    expect(junk.pageSize).toBe(ISSUES_PAGE_SIZE);
+  });
+});

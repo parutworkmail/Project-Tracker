@@ -16,7 +16,12 @@ export interface IssueFilterState {
   label: string;
   sort: IssueSort;
   page: number;
+  view: BoardView;
 }
+
+export type BoardView = "list" | "board";
+
+export const BOARD_PAGE_SIZE = 100;
 
 type RawParams = Record<string, string | string[] | undefined>;
 
@@ -42,6 +47,7 @@ export function parseIssueFilters(params: RawParams): IssueFilterState {
     label: first(params.label).slice(0, 64),
     sort: SORTS.includes(sort as IssueSort) ? (sort as IssueSort) : "newest",
     page: Number.isFinite(page) && page > 1 ? Math.min(page, 1_000_000) : 1,
+    view: first(params.view) === "board" ? "board" : "list",
   };
 }
 
@@ -59,6 +65,7 @@ export function buildBoardQuery(
   if (merged.label) query.set("label", merged.label);
   if (merged.sort !== "newest") query.set("sort", merged.sort);
   if (merged.page > 1) query.set("page", String(merged.page));
+  if (merged.view === "board") query.set("view", "board");
 
   const text = query.toString();
   return text ? `?${text}` : "";

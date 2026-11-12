@@ -19,6 +19,7 @@ export const ISSUE_SORTS = [
 export type IssueSort = (typeof ISSUE_SORTS)[number];
 
 export const ISSUES_PAGE_SIZE = 25;
+export const MAX_PAGE_SIZE = 200;
 
 export const LABEL_COLORS = [
   "gray",
@@ -275,6 +276,7 @@ export interface IssueSearchOptions {
   label?: string;
   sort?: IssueSort;
   page?: number;
+  pageSize?: number;
 }
 
 const ORDER_BY: Record<IssueSort, string> = {
@@ -336,14 +338,17 @@ export async function searchIssues(
   const page = Number.isFinite(requestedPage)
     ? Math.min(Math.max(1, Math.floor(requestedPage)), 1_000_000)
     : 1;
-  const offset = (page - 1) * ISSUES_PAGE_SIZE;
+  const pageSize = Number.isFinite(Number(options.pageSize))
+    ? Math.min(Math.max(1, Math.floor(Number(options.pageSize))), MAX_PAGE_SIZE)
+    : ISSUES_PAGE_SIZE;
+  const offset = (page - 1) * pageSize;
 
   const [issues, countRows] = await Promise.all([
     prisma.$queryRawUnsafe<Issue[]>(
       `SELECT ${issueColumns(schemaName)} FROM "${schemaName}"."issues"
        ${where}
        ORDER BY ${orderBy}
-       LIMIT ${ISSUES_PAGE_SIZE} OFFSET ${offset}`,
+       LIMIT ${pageSize} OFFSET ${offset}`,
       ...values
     ),
     prisma.$queryRawUnsafe<{ count: bigint | number | string }[]>(
@@ -356,7 +361,7 @@ export async function searchIssues(
     issues,
     total: Number(countRows[0]?.count ?? 0),
     page,
-    pageSize: ISSUES_PAGE_SIZE,
+    pageSize,
   };
 }
 

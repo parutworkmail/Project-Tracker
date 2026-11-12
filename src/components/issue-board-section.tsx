@@ -4,8 +4,10 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { searchIssues } from "@/lib/projectSchema";
 import { IssueTable } from "@/components/issue-table";
+import { KanbanBoard } from "@/components/kanban-board";
 import { userLabel } from "@/lib/issueMeta";
 import {
+  BOARD_PAGE_SIZE,
   buildBoardQuery,
   hasActiveFilters,
   type IssueFilterState,
@@ -22,17 +24,20 @@ export async function IssueBoardSection({
   canManage: boolean;
   filters: IssueFilterState;
 }) {
+  const isBoard = filters.view === "board";
+
   const { issues, total, page, pageSize } = await searchIssues(schemaName, {
     q: filters.q || undefined,
-    status: filters.status || undefined,
+    status: isBoard ? undefined : filters.status || undefined,
     priority: filters.priority || undefined,
     assignee: filters.assignee || undefined,
     label: filters.label || undefined,
     sort: filters.sort,
-    page: filters.page,
+    page: isBoard ? 1 : filters.page,
+    pageSize: isBoard ? BOARD_PAGE_SIZE : undefined,
   });
 
-  if (issues.length === 0 && total > 0 && page > 1) {
+  if (!isBoard && issues.length === 0 && total > 0 && page > 1) {
     const lastPage = Math.max(1, Math.ceil(total / pageSize));
     redirect(`/${slug}/board${buildBoardQuery(filters, { page: lastPage })}`);
   }
@@ -55,6 +60,17 @@ export async function IssueBoardSection({
   );
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  if (isBoard) {
+    return (
+      <KanbanBoard
+        slug={slug}
+        issues={issues}
+        assigneeNames={assigneeNames}
+        total={total}
+      />
+    );
+  }
 
   return (
     <div>
