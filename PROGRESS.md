@@ -6,6 +6,27 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
+- **Plan (user feedback #1)**: Login page keeps what the user typed after
+  leaving to another page and coming back (browser back / bfcache / form
+  restore). The form must be empty whenever the user returns. Find why the
+  values survive, fix so username/password never persist, test in real
+  Chrome (type, navigate away, go back), local commit, no push.
+- **Status**: DONE, committed locally (not pushed). Cause: Next.js (Cache
+  Components) keeps a page you left mounted and shows it again, so the
+  username, password, show-password toggle and form errors all survived.
+  Fix: new `components/fresh-on-return.tsx` wraps the login form and remounts
+  it when the page is hidden. Reproduced FAIL before, PASS after in real
+  Chrome (browser Back, client link back, validation errors, ?message= page,
+  typing still works) via new `scripts/login-persist-check.mjs`. Ran against
+  the USER'S dev server on :3000 (Supabase) because only one dev server can
+  run per project; the check never logs in, so nothing was written to
+  Supabase. tsc + eslint clean, 384 unit tests pass. NOT run: npm run build
+  (would break the user's running dev server) and a real successful login
+  after the change (would write to Supabase). A ?message= text in the URL
+  still shows when you return to that exact URL (it comes from the address).
+  Same carry-over very likely exists on the other forms (change-password,
+  create user, comments, filters) - not changed, not asked.
+
 - **Plan (NEW DAY)**: User said it is a new day: tell the plan and continue.
   Today: (1) verify the real state (git status, dev server, test DB), (2)
   finish feature 1 (issue numbers + activity): run the untested `DO

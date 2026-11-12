@@ -8,11 +8,14 @@ import { Suspense, useState } from "react";
 
 import { loginSchema, type LoginInput } from "@/lib/validation/auth";
 import { PasswordInput } from "@/components/password-input";
+import { FreshOnReturn } from "@/components/fresh-on-return";
 
 export default function LoginPage() {
   return (
     <Suspense fallback={null}>
-      <LoginForm />
+      <FreshOnReturn>
+        <LoginForm />
+      </FreshOnReturn>
     </Suspense>
   );
 }
