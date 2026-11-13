@@ -6,7 +6,7 @@ export function SiteFooter() {
 
   return (
     <footer className="mt-auto border-t border-black/[.06] px-6 py-4 text-center text-xs text-muted dark:border-white/[.08]">
-      <span>Developed by John Doe</span>
+      <span>Developed by Parut Na</span>
       <span aria-hidden="true" className="mx-2">
         ·
       </span>
