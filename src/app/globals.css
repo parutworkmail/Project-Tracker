@@ -62,6 +62,8 @@
   --animate-fade-up: fade-up 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   --animate-fade-in: fade-in 0.25s ease-out both;
   --animate-pop: pop 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  --animate-fade-out: fade-out 0.18s ease-in both;
+  --animate-pop-out: pop-out 0.18s ease-in both;
   --animate-float: float 9s ease-in-out infinite;
   --animate-float-slow: float 14s ease-in-out infinite reverse;
   --animate-shimmer: shimmer 1.6s linear infinite;
@@ -93,6 +95,24 @@
     to {
       opacity: 1;
       transform: translateY(0) scale(1);
+    }
+  }
+  @keyframes fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes pop-out {
+    from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(6px) scale(0.96);
     }
   }
   @keyframes float {
@@ -214,6 +234,28 @@ body {
   transform: scaleX(1);
 }
 
+/* Clickable project cards: a visible Open button at rest, a stronger lift on hover */
+.project-card {
+  box-shadow: 0 1px 2px rgba(27, 36, 51, 0.06), 0 10px 26px -16px rgba(27, 36, 51, 0.28);
+}
+.project-card-open {
+  transition: background-color 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+}
+.project-card:hover .project-card-open,
+.project-card:focus-visible .project-card-open {
+  background-color: var(--accent);
+  border-color: var(--accent-strong);
+  color: var(--on-accent);
+  transform: translate(2px, -2px);
+}
+.project-card:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+.project-card:active {
+  transform: translateY(-1px) scale(0.99);
+}
+
 .skeleton {
   background-image: linear-gradient(
     100deg,
@@ -280,6 +322,54 @@ a.btn-hero:hover {
 .btn-secondary:hover {
   background-color: color-mix(in oklab, var(--foreground) 8%, var(--surface));
   box-shadow: inset 0 0 0 1.5px var(--foreground);
+}
+
+/* Global top progress bar: crawls while a page change is loading, then completes and fades.
+   It only appears after 120 ms, so instant navigations never flash it. */
+.nav-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 60;
+  pointer-events: none;
+  transform-origin: left center;
+  background-image: linear-gradient(90deg, var(--accent-strong), var(--accent));
+  box-shadow: 0 0 10px var(--glow);
+  opacity: 0;
+  transform: scaleX(1);
+  transition: opacity 0.35s ease;
+}
+.nav-progress[data-active="true"] {
+  opacity: 1;
+  transition: opacity 0s linear 0.12s;
+  animation: nav-progress-crawl 12s cubic-bezier(0.08, 0.6, 0.2, 1) forwards;
+}
+@keyframes nav-progress-crawl {
+  from {
+    transform: scaleX(0.02);
+  }
+  to {
+    transform: scaleX(0.92);
+  }
+}
+
+/* Small spinner used inside buttons that are waiting on the server */
+.btn-spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  flex: none;
+  border-radius: 9999px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: btn-spin 0.7s linear infinite;
+}
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 button {

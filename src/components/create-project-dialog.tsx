@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter, useNavigationBusy } from "@/lib/useAppRouter";
+import { ActionButton } from "@/components/action-button";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -19,10 +20,14 @@ interface AvailableUser {
 
 export function CreateProjectDialog({
   availableUsers,
+  stayOnPage = false,
 }: {
   availableUsers: AvailableUser[];
+  // false (dashboard): open the new project. true (admin console): stay and just refresh the list.
+  stayOnPage?: boolean;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
+  const navigating = useNavigationBusy();
   const [open, setOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
@@ -38,6 +43,10 @@ export function CreateProjectDialog({
 
   function closeDialog() {
     setOpen(false);
+  }
+
+  // Clear the form only after the dialog has faded out, so it does not blank mid-animation.
+  function clearForm() {
     reset();
     setSelectedIds([]);
     setFormError(null);
@@ -68,7 +77,9 @@ export function CreateProjectDialog({
 
     const project = await res.json();
     closeDialog();
-    router.push(`/${project.slug}`);
+    if (!stayOnPage) {
+      router.push(`/${project.slug}`);
+    }
     router.refresh();
   }
 
@@ -82,7 +93,12 @@ export function CreateProjectDialog({
         + New project
       </button>
 
-      <Dialog open={open} onClose={closeDialog} title="Create project">
+      <Dialog
+        open={open}
+        onClose={closeDialog}
+        onExited={clearForm}
+        title="Create project"
+      >
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <label htmlFor="create-project-name" className="text-sm font-medium">
@@ -127,13 +143,14 @@ export function CreateProjectDialog({
           {formError && <p className="text-sm text-red-600">{formError}</p>}
 
           <div className="flex items-center gap-2">
-            <button
+            <ActionButton
               type="submit"
-              disabled={isSubmitting}
-              className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50"
+              pending={isSubmitting || navigating}
+              pendingLabel="Creating..."
+              className="rounded bg-foreground px-4 py-2 text-background"
             >
-              {isSubmitting ? "Creating..." : "Create project"}
-            </button>
+              Create project
+            </ActionButton>
             <button
               type="button"
               onClick={closeDialog}

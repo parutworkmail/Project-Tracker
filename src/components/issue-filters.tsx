@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/lib/useAppRouter";
 
 import {
   ISSUE_PRIORITY_LIST,
@@ -40,7 +40,7 @@ export function IssueFilters({
   assignees: Assignee[];
   labels: IssueLabelView[];
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const [search, setSearch] = useState(filters.q);
   const [lastPushed, setLastPushed] = useState(filters.q);
   const [seenQ, setSeenQ] = useState(filters.q);

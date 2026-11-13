@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter, useNavigationBusy } from "@/lib/useAppRouter";
+import { ActionButton } from "@/components/action-button";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -16,7 +17,8 @@ export function ChangePasswordForm({
 }: {
   redirectTo?: string;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
+  const navigating = useNavigationBusy();
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
@@ -95,13 +97,14 @@ export function ChangePasswordForm({
         </p>
       )}
 
-      <button
+      <ActionButton
         type="submit"
-        disabled={isSubmitting}
-        className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50"
+        pending={isSubmitting || navigating}
+        pendingLabel="Saving..."
+        className="rounded bg-foreground px-4 py-2 text-background"
       >
-        {isSubmitting ? "Saving..." : "Set new password"}
-      </button>
+        Set new password
+      </ActionButton>
     </form>
   );
 }

@@ -6,6 +6,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { isSuperAdmin } from "@/lib/permissions";
 import { updateUserSchema } from "@/lib/validation/admin";
 import { withApiErrorHandling } from "@/lib/apiError";
+import { actor, recordAudit } from "@/lib/audit";
 import { enforceRateLimit, HOUR } from "@/lib/enforceRateLimit";
 
 async function handlePATCH(
@@ -73,6 +74,19 @@ async function handlePATCH(
 
   try {
     const updated = await prisma.user.update({ where: { id: userId }, data });
+
+    const roleChanged = parsed.data.role !== undefined && parsed.data.role !== existing.role;
+
+    await recordAudit({
+      ...actor(session.user),
+      level: roleChanged ? "WARN" : "INFO",
+      category: "user",
+      action: roleChanged ? "user.role_changed" : "user.updated",
+      message: roleChanged
+        ? `Changed role of "${updated.username}" from ${existing.role} to ${updated.role}`
+        : `Edited the details of user "${updated.username}"`,
+      target: `user:${updated.username}`,
+    });
 
     return NextResponse.json({
       id: updated.id,
@@ -147,6 +161,15 @@ async function handleDELETE(
 
     throw error;
   }
+
+  await recordAudit({
+    ...actor(session.user),
+    level: "WARN",
+    category: "user",
+    action: "user.deleted",
+    message: `Deleted user "${existing.username}" (${existing.role})`,
+    target: `user:${existing.username}`,
+  });
 
   return NextResponse.json({ ok: true });
 }

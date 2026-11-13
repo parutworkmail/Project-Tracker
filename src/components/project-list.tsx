@@ -12,31 +12,6 @@ export interface ProjectCardData {
   createdAt: string;
 }
 
-function StatTile({
-  label,
-  value,
-  hint,
-  delay,
-}: {
-  label: string;
-  value: string | number;
-  hint: string;
-  delay: number;
-}) {
-  return (
-    <div
-      className="surface animate-fade-up rounded-2xl px-5 py-4"
-      style={{ animationDelay: `${delay}ms` }}
-    >
-      <p className="text-xs font-medium uppercase tracking-wide text-muted">
-        {label}
-      </p>
-      <p className="gradient-text mt-1 text-3xl font-semibold">{value}</p>
-      <p className="mt-0.5 text-xs text-muted">{hint}</p>
-    </div>
-  );
-}
-
 export function ProjectList({
   projects,
   isSuperAdmin,
@@ -90,36 +65,14 @@ export function ProjectList({
     );
   }
 
-  const managedCount = projects.filter((p) => p.isManager).length;
-  const peopleCount = projects.reduce((sum, p) => sum + p.memberCount, 0);
-  const showStats = !query && page === 1;
-
   return (
     <div>
-      {showStats && (
-        <div className="mb-6 grid gap-4 sm:grid-cols-3">
-          <StatTile
-            label="Projects"
-            value={totalCount}
-            hint={totalCount === 1 ? "space you can open" : "spaces you can open"}
-            delay={0}
-          />
-          <StatTile
-            label="You manage"
-            value={managedCount}
-            hint="with full control"
-            delay={70}
-          />
-          <StatTile
-            label="Collaborators"
-            value={peopleCount}
-            hint="across this page"
-            delay={140}
-          />
-        </div>
-      )}
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <h2 className="text-lg font-semibold tracking-tight">Your projects</h2>
+        <p className="text-xs text-muted">Click a project to open it in a new tab</p>
+      </div>
 
-      <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {projects.map((project, index) => (
           <li
             key={project.id}
@@ -130,7 +83,8 @@ export function ProjectList({
               href={`/${project.slug}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="surface card-lift group block rounded-2xl p-5"
+              aria-label={`Open project ${project.name}`}
+              className="project-card surface card-lift group relative block cursor-pointer rounded-2xl p-5"
             >
               <div className="flex items-start gap-4">
                 <Avatar name={project.name} seed={project.slug} size={46} />
@@ -138,20 +92,23 @@ export function ProjectList({
                   <h3 className="truncate font-semibold">{project.name}</h3>
                   <p className="truncate text-xs text-muted">/{project.slug}</p>
                 </div>
-                <svg
-                  viewBox="0 0 24 24"
-                  width="18"
-                  height="18"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                <span
                   aria-hidden="true"
-                  className="mt-1 text-muted opacity-0 transition-all duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-foreground dark:group-hover:text-accent-text group-hover:opacity-100"
+                  className="project-card-open flex h-9 w-9 flex-none items-center justify-center rounded-full border border-black/[.12] text-foreground dark:border-white/[.2]"
                 >
-                  <path d="M7 17 17 7M8 7h9v9" />
-                </svg>
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M7 17 17 7M8 7h9v9" />
+                  </svg>
+                </span>
               </div>
 
               <div className="mt-5 flex items-center justify-between text-xs">

@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 import { withApiErrorHandling } from "@/lib/apiError";
+import { actor, recordAudit } from "@/lib/audit";
 
 const JOIN_LIMIT = 20;
 const JOIN_WINDOW_MS = 60 * 60 * 1000;
@@ -51,6 +52,16 @@ async function handlePOST(
       userId: session.user.id,
     },
     update: {},
+  });
+
+  await recordAudit({
+    ...actor(session.user),
+    level: "INFO",
+    category: "project",
+    action: "project.member_joined",
+    message: `Joined project "${project.name}"`,
+    target: `project:${project.slug}`,
+    ip,
   });
 
   return NextResponse.json({ ok: true });

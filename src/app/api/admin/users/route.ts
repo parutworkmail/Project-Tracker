@@ -7,6 +7,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { isSuperAdmin } from "@/lib/permissions";
 import { createUserSchema } from "@/lib/validation/admin";
 import { withApiErrorHandling } from "@/lib/apiError";
+import { actor, recordAudit } from "@/lib/audit";
 import { enforceRateLimit, HOUR } from "@/lib/enforceRateLimit";
 
 async function handleGET() {
@@ -95,6 +96,15 @@ async function handlePOST(request: Request) {
         role,
         mustChangePassword: true,
       },
+    });
+
+    await recordAudit({
+      ...actor(session.user),
+      level: "INFO",
+      category: "user",
+      action: "user.created",
+      message: `Created user "${user.username}" with role ${user.role}`,
+      target: `user:${user.username}`,
     });
 
     return NextResponse.json(

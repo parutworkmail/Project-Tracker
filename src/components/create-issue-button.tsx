@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/lib/useAppRouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -32,7 +32,7 @@ export function CreateIssueButton({
   slug: string;
   assignees: Assignee[];
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const [open, setOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -54,6 +54,10 @@ export function CreateIssueButton({
 
   function closeAndReset() {
     setOpen(false);
+  }
+
+  // Clear the form only after the dialog has faded out, so it does not blank mid-animation.
+  function clearForm() {
     setFormError(null);
     reset();
   }
@@ -100,7 +104,7 @@ export function CreateIssueButton({
         + Create task
       </button>
 
-      <Dialog open={open} onClose={close} title="Create task">
+      <Dialog open={open} onClose={close} onExited={clearForm} title="Create task">
         <form
           onSubmit={handleSubmit(onCreate)}
           className="flex flex-col gap-3"

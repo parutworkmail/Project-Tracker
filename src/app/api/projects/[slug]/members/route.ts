@@ -6,6 +6,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { addProjectMemberSchema } from "@/lib/validation/project";
 import { canManageProject } from "@/lib/permissions";
 import { withApiErrorHandling } from "@/lib/apiError";
+import { actor, recordAudit } from "@/lib/audit";
 import { enforceRateLimit, HOUR } from "@/lib/enforceRateLimit";
 
 async function handlePOST(
@@ -89,6 +90,15 @@ async function handlePOST(
 
     throw error;
   }
+
+  await recordAudit({
+    ...actor(session.user),
+    level: "INFO",
+    category: "project",
+    action: "project.member_added",
+    message: `Added "${targetUser.username}" to "${project.name}"`,
+    target: `project:${project.slug}`,
+  });
 
   return NextResponse.json(
     {

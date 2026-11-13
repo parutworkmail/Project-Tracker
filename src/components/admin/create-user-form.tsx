@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter, useNavigationBusy } from "@/lib/useAppRouter";
+import { ActionButton } from "@/components/action-button";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -14,7 +15,8 @@ import { PasswordInput } from "@/components/password-input";
 const ROLES = ["USER", "ADMIN", "SUPER_ADMIN"] as const;
 
 export function CreateUserForm() {
-  const router = useRouter();
+  const router = useAppRouter();
+  const navigating = useNavigationBusy();
   const [formError, setFormError] = useState<string | null>(null);
   const [createdUsername, setCreatedUsername] = useState<string | null>(null);
 
@@ -177,13 +179,14 @@ export function CreateUserForm() {
         </p>
       )}
 
-      <button
+      <ActionButton
         type="submit"
-        disabled={isSubmitting}
-        className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50"
+        pending={isSubmitting || navigating}
+        pendingLabel="Creating..."
+        className="rounded bg-foreground px-4 py-2 text-background"
       >
-        {isSubmitting ? "Creating..." : "Create user"}
-      </button>
+        Create user
+      </ActionButton>
     </form>
   );
 }

@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter, useNavigationBusy } from "@/lib/useAppRouter";
+import { ActionButton } from "@/components/action-button";
 
 export function JoinProjectButton({ slug }: { slug: string }) {
-  const router = useRouter();
+  const router = useAppRouter();
+  const navigating = useNavigationBusy();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,13 +31,14 @@ export function JoinProjectButton({ slug }: { slug: string }) {
       <p className="text-zinc-600 dark:text-zinc-400">
         You are not a member of this project yet.
       </p>
-      <button
+      <ActionButton
         onClick={handleJoin}
-        disabled={loading}
-        className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50"
+        pending={loading || navigating}
+        pendingLabel="Joining..."
+        className="rounded bg-foreground px-4 py-2 text-background"
       >
-        {loading ? "Joining..." : "Join project"}
-      </button>
+        Join project
+      </ActionButton>
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   );

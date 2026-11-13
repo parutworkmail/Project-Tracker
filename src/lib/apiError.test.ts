@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DbUnavailableError } from "@/lib/prisma";
+import { recordAudit } from "@/lib/audit";
 import { Prisma } from "@/generated/prisma/client";
 import { isDbConnectionError, withApiErrorHandling } from "./apiError";
 
@@ -166,5 +167,75 @@ describe("withApiErrorHandling", () => {
     expect(response.status).toBe(500);
     expect(typeof body.error).toBe("string");
     expect(body.error).not.toContain("secret stack trace");
+  });
+});
+
+describe("withApiErrorHandling audit trail", () => {
+  beforeEach(() => {
+    vi.mocked(recordAudit).mockClear();
+  });
+
+  it("records an ERROR entry (route, method, message, stack) for an unexpected failure", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const handler = withApiErrorHandling(async () => {
+      throw new TypeError("boom");
+    });
+
+    const response = await handler(
+      new Request("http://localhost/api/projects/x/issues", { method: "POST" })
+    );
+
+    expect(response.status).toBe(500);
+    expect(recordAudit).toHaveBeenCalledTimes(1);
+    expect(recordAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: "ERROR",
+        category: "system",
+        action: "api.error",
+        message: "POST /api/projects/x/issues failed: boom",
+        target: "/api/projects/x/issues",
+        meta: expect.objectContaining({ method: "POST", error: "TypeError" }),
+      })
+    );
+    spy.mockRestore();
+  });
+
+  it("does NOT write an entry when the database is down (it would hang the response and cannot succeed)", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const handler = withApiErrorHandling(async () => {
+      throw new DbUnavailableError("no database");
+    });
+
+    const response = await handler(new Request("http://localhost/api/x"));
+
+    expect(response.status).toBe(503);
+    expect(recordAudit).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("does not write an entry for redirects and other Next.js control-flow errors", async () => {
+    const handler = withApiErrorHandling(async () => {
+      throw Object.assign(new Error("NEXT_REDIRECT"), { digest: "NEXT_REDIRECT;replace;/x;307;" });
+    });
+
+    await expect(handler(new Request("http://localhost/api/x"))).rejects.toBeTruthy();
+    expect(recordAudit).not.toHaveBeenCalled();
+  });
+
+  it("treats pg timeouts and resets as database-down, not as bugs", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    for (const message of [
+      "Connection terminated due to connection timeout",
+      "timeout expired",
+      "read ECONNRESET",
+      "server closed the connection unexpectedly",
+    ]) {
+      const handler = withApiErrorHandling(async () => {
+        throw new Error(message);
+      });
+      expect((await handler(new Request("http://localhost/api/x"))).status).toBe(503);
+    }
+    expect(recordAudit).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 });

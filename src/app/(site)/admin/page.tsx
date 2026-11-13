@@ -7,6 +7,7 @@ import { UserRoleManager } from "@/components/admin/user-role-manager";
 import { ProjectAdminManager } from "@/components/admin/project-admin-manager";
 import { BackLink } from "@/components/back-link";
 import { AssignmentHistory } from "@/components/admin/assignment-history";
+import { CreateProjectDialog } from "@/components/create-project-dialog";
 
 export const instant = false;
 
@@ -77,7 +78,15 @@ export default async function AdminPage() {
         </section>
 
         <section className="mb-12">
-          <h2 className="mb-4 text-lg font-medium">Projects</h2>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-medium">Projects</h2>
+            <CreateProjectDialog
+              stayOnPage
+              availableUsers={users
+                .filter((u) => u.id !== session.user.id)
+                .map((u) => ({ id: u.id, username: u.username, name: u.name }))}
+            />
+          </div>
           <ProjectAdminManager
             projects={projects.map((p) => ({
               id: p.id,

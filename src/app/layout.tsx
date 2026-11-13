@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import { Providers } from "@/components/providers";
+import { NavigationProgress } from "@/components/navigation-progress";
+import { SiteFooter } from "@/components/site-footer";
 import { THEME_INIT_SCRIPT } from "@/lib/themeScript";
 
 const geistSans = Geist({
@@ -31,7 +34,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col">
+        <Suspense fallback={null}>
+          <NavigationProgress />
+        </Suspense>
         <Providers>{children}</Providers>
+        <SiteFooter />
       </body>
     </html>
   );

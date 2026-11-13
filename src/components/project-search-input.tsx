@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/lib/useAppRouter";
 
 export function ProjectSearchInput({ initialQuery }: { initialQuery: string }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const [value, setValue] = useState(initialQuery);
 
   useEffect(() => {

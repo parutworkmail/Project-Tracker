@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { isSuperAdmin } from "@/lib/permissions";
 import { assignProjectAdminSchema } from "@/lib/validation/admin";
 import { withApiErrorHandling } from "@/lib/apiError";
+import { actor, recordAudit } from "@/lib/audit";
 
 async function handlePOST(
   request: Request,
@@ -73,6 +74,15 @@ async function handlePOST(
       assignedById: session.user.id,
     },
     update: {},
+  });
+
+  await recordAudit({
+    ...actor(session.user),
+    level: "INFO",
+    category: "project",
+    action: "project.admin_assigned",
+    message: `Made "${targetUser.username}" an admin of "${project.name}"`,
+    target: `project:${project.slug}`,
   });
 
   return NextResponse.json({ ok: true }, { status: 201 });

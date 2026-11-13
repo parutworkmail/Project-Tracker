@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/lib/useAppRouter";
 
 import { Dialog } from "@/components/dialog";
 import { PasswordInput } from "@/components/password-input";
@@ -22,13 +22,15 @@ async function readError(res: Response, fallback: string): Promise<string> {
 }
 
 export function EditUserDialog({
+  open,
   user,
   onClose,
 }: {
+  open: boolean;
   user: EditableUser;
   onClose: () => void;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const [username, setUsername] = useState(user.username);
   const [name, setName] = useState(user.name ?? "");
   const [email, setEmail] = useState(user.email ?? "");
@@ -73,7 +75,11 @@ export function EditUserDialog({
   }
 
   return (
-    <Dialog open onClose={saving ? () => {} : onClose} title={`Edit ${user.username}`}>
+    <Dialog
+      open={open}
+      onClose={saving ? () => {} : onClose}
+      title={`Edit ${user.username}`}
+    >
       <form onSubmit={handleSubmit} className="flex flex-col gap-3" noValidate>
         <div className="flex flex-col gap-1">
           <label htmlFor="edit-username" className="text-sm font-medium">
@@ -148,13 +154,15 @@ export function EditUserDialog({
 }
 
 export function ResetPasswordDialog({
+  open,
   user,
   onClose,
 }: {
+  open: boolean;
   user: EditableUser;
   onClose: () => void;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [saving, setSaving] = useState(false);
@@ -202,7 +210,7 @@ export function ResetPasswordDialog({
 
   return (
     <Dialog
-      open
+      open={open}
       onClose={saving ? () => {} : onClose}
       title={`Reset password for ${user.username}`}
     >

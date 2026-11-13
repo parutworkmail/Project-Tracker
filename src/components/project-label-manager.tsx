@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/lib/useAppRouter";
 
 import { LabelChip } from "@/components/label-chip";
+import { useConfirm } from "@/components/confirm-provider";
 import { LabelCreateForm } from "@/components/label-create-form";
 import type { IssueLabelView } from "@/lib/issueMeta";
 
@@ -14,18 +15,25 @@ export function ProjectLabelManager({
   slug: string;
   labels: IssueLabelView[];
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   async function remove(label: IssueLabelView) {
-    if (
-      !window.confirm(
-        `Delete the label "${label.name}"? It is removed from every task.`
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: "Delete label?",
+      message: (
+        <>
+          Delete the label <strong>{label.name}</strong>? It is removed from
+          every task.
+        </>
+      ),
+      confirmLabel: "Delete label",
+      tone: "danger",
+    });
+
+    if (!ok) return;
 
     setBusyId(label.id);
     setError(null);

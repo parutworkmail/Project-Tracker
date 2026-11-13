@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter, useNavigationBusy } from "@/lib/useAppRouter";
+import { ActionButton } from "@/components/action-button";
+import { useConfirm } from "@/components/confirm-provider";
 
 import { LabelChip } from "@/components/label-chip";
 import { LabelCreateForm } from "@/components/label-create-form";
@@ -51,7 +53,9 @@ export function IssueDetailForm({
   formerAssigneeLabel: string | null;
   canManage: boolean;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
+  const navigating = useNavigationBusy();
+  const confirm = useConfirm();
   const [title, setTitle] = useState(issue.title);
   const [description, setDescription] = useState(issue.description ?? "");
   const [status, setStatus] = useState<IssueStatus>(issue.status);
@@ -143,11 +147,19 @@ export function IssueDetailForm({
   }
 
   async function handleDelete() {
-    if (
-      !window.confirm(`Delete task "${issue.title}"? This cannot be undone.`)
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: "Delete task?",
+      message: (
+        <>
+          Delete <strong>{issue.title}</strong>? Its comments and history are
+          removed too. This cannot be undone.
+        </>
+      ),
+      confirmLabel: "Delete task",
+      tone: "danger",
+    });
+
+    if (!ok) return;
 
     setSaving(true);
 
@@ -336,23 +348,26 @@ export function IssueDetailForm({
       </fieldset>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button
+        <ActionButton
           type="submit"
-          disabled={saving || !isDirty}
-          className="rounded bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
+          pending={saving || navigating}
+          pendingLabel="Saving…"
+          disabled={!isDirty}
+          className="rounded bg-foreground px-4 py-2 text-sm font-medium text-background"
         >
-          {saving ? "Saving…" : "Save changes"}
-        </button>
+          Save changes
+        </ActionButton>
 
         {canManage && (
-          <button
-            type="button"
+          <ActionButton
             onClick={handleDelete}
+            pending={navigating}
+            pendingLabel="Deleting…"
             disabled={saving}
-            className="rounded border border-red-300 px-4 py-2 text-sm text-red-600 disabled:opacity-50 dark:border-red-900"
+            className="rounded border border-red-300 px-4 py-2 text-sm text-red-600 dark:border-red-900"
           >
             Delete task
-          </button>
+          </ActionButton>
         )}
 
         {message && (

@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { canManageProject } from "@/lib/permissions";
 import { ProjectManageControls } from "@/components/project-manage-controls";
 import { ProjectMemberManager } from "@/components/project-member-manager";
-import { ProjectNav } from "@/components/project-nav";
 import { ProjectLabelManager } from "@/components/project-label-manager";
 import { listLabels } from "@/lib/projectSchema";
 
@@ -56,13 +55,6 @@ export default async function ProjectSettingsPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <ProjectNav
-        slug={project.slug}
-        name={project.name}
-        active="settings"
-        canManage={canManage}
-      />
-
       <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-8">
         <section className="mb-8">
           <h2 className="mb-3 text-sm font-medium text-zinc-500">

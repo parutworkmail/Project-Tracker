@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/lib/useAppRouter";
+import { DeleteProjectDialog } from "@/components/admin/delete-project-dialog";
+import { useConfirm } from "@/components/confirm-provider";
 
 interface AdminUser {
   id: string;
@@ -25,10 +27,22 @@ export function ProjectAdminManager({
   projects: ProjectRow[];
   availableAdmins: AdminUser[];
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const [pendingSlug, setPendingSlug] = useState<string | null>(null);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
+  // The dialog stays mounted while it fades out, so the project is kept apart from
+  // the open flag; the sequence number gives every opening an empty confirmation field.
+  const [deleting, setDeleting] = useState<ProjectRow | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteSeq, setDeleteSeq] = useState(0);
+
+  function openDelete(project: ProjectRow) {
+    setDeleting(project);
+    setDeleteSeq((n) => n + 1);
+    setDeleteOpen(true);
+  }
 
   async function assign(slug: string) {
     const userId = selected[slug];
@@ -56,7 +70,21 @@ export function ProjectAdminManager({
     router.refresh();
   }
 
-  async function unassign(slug: string, userId: string) {
+  async function unassign(slug: string, userId: string, adminLabel: string, projectName: string) {
+    const ok = await confirm({
+      title: "Remove project admin?",
+      message: (
+        <>
+          Remove <strong>{adminLabel}</strong> as an admin of <strong>{projectName}</strong>?
+          They keep their account and any membership, but lose the ability to manage the project.
+        </>
+      ),
+      confirmLabel: "Remove admin",
+      tone: "danger",
+    });
+
+    if (!ok) return;
+
     setPendingSlug(slug);
     setError(null);
 
@@ -96,10 +124,20 @@ export function ProjectAdminManager({
             >
               <div className="mb-2 flex items-center justify-between">
                 <span className="font-medium">{project.name}</span>
-                <span className="text-xs text-zinc-500">
-                  {project.memberCount} member
-                  {project.memberCount !== 1 ? "s" : ""}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-zinc-500">
+                    {project.memberCount} member
+                    {project.memberCount !== 1 ? "s" : ""}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => openDelete(project)}
+                    aria-label={`Delete project ${project.name}`}
+                    className="rounded border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:border-red-900 dark:hover:bg-red-950/40"
+                  >
+                    Delete project
+                  </button>
+                </div>
               </div>
 
               <div className="mb-3 flex flex-wrap gap-2">
@@ -117,7 +155,14 @@ export function ProjectAdminManager({
                       <button
                         type="button"
                         disabled={pendingSlug === project.slug}
-                        onClick={() => unassign(project.slug, admin.id)}
+                        onClick={() =>
+                          unassign(
+                            project.slug,
+                            admin.id,
+                            admin.name ?? admin.username,
+                            project.name
+                          )
+                        }
                         className="text-red-600 disabled:opacity-50"
                         aria-label={`Remove ${admin.username} as admin`}
                       >
@@ -168,6 +213,16 @@ export function ProjectAdminManager({
             </div>
           );
         })
+      )}
+
+      {deleting && (
+        <DeleteProjectDialog
+          key={deleteSeq}
+          open={deleteOpen}
+          project={deleting}
+          onClose={() => setDeleteOpen(false)}
+          onExited={() => setDeleting(null)}
+        />
       )}
     </div>
   );

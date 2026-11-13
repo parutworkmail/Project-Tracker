@@ -2,14 +2,22 @@ import { NextResponse } from "next/server";
 
 import { Prisma } from "@/generated/prisma/client";
 import { DbUnavailableError } from "@/lib/prisma";
+import { recordAudit } from "@/lib/audit";
 
 const CONNECTION_ERROR_CODES = new Set([
   "ECONNREFUSED",
+  "ECONNRESET",
   "ENOTFOUND",
   "ETIMEDOUT",
   "EHOSTUNREACH",
   "ENETUNREACH",
 ]);
+
+// Messages node-postgres / pg-pool use when the connection could not be opened or
+// was cut (they carry no error code), e.g. "Connection terminated due to
+// connection timeout" from a pool that never got a connection.
+const CONNECTION_MESSAGE_PATTERN =
+  /connection terminated|connection timeout|timeout expired|server closed the connection|can.t reach database server|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EHOSTUNREACH|ENETUNREACH/i;
 
 // Next.js implements redirect()/notFound()/forbidden()/unauthorized() and
 // its own build-time prerendering bailout signals by throwing errors
@@ -85,8 +93,14 @@ function hasNestedDatabaseNotReachableCause(
 
   if (
     typeof err.message === "string" &&
-    err.message.includes("DatabaseNotReachable")
+    (err.message.includes("DatabaseNotReachable") ||
+      CONNECTION_MESSAGE_PATTERN.test(err.message))
   ) {
+    return true;
+  }
+
+  const nestedCode = (error as { code?: unknown }).code;
+  if (typeof nestedCode === "string" && CONNECTION_ERROR_CODES.has(nestedCode)) {
     return true;
   }
 
@@ -124,6 +138,30 @@ export function withApiErrorHandling<Args extends unknown[]>(
       }
 
       console.error("Unhandled API error:", error);
+
+      let path = "";
+      try {
+        path = new URL(request.url).pathname;
+      } catch {
+        path = "";
+      }
+
+      // Not written for database outages (above): the database is what is down.
+      await recordAudit({
+        level: "ERROR",
+        category: "system",
+        action: "api.error",
+        message: `${request.method} ${path} failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        target: path,
+        meta: {
+          method: request.method,
+          error: error instanceof Error ? error.name : typeof error,
+          stack: error instanceof Error ? error.stack?.split("\n").slice(0, 6).join("\n") : undefined,
+        },
+      });
+
       return NextResponse.json(
         { error: "Internal server error." },
         { status: 500 }

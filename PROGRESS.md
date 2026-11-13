@@ -6,6 +6,797 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
+- **Plan (user: "commit everything and push just this time, end of week")**: user explicitly
+  allows ONE push now. Order: (1) full validation on the current tree (tsc, eslint, full
+  vitest, production build against the LOCAL db env) and fix anything that fails FIRST,
+  (2) CHANGELOG + tidy, (3) commit everything (incl. the #18 work), (4) annotated tag v0.0.1,
+  (5) ONE push of main with the tag, (6) restart the user's :3000 dev server, stop my test
+  DB. The end-to-end loop script is NOT done and will be reported as such. Supabase DB is
+  not touched; the AuditLog migration must be applied there by the user.
+- **Status**: validation done, committing + tagging v0.0.1 + ONE push now (user left, said no
+  more tests). Results just before: tsc clean, eslint 0 errors (3 old warnings), 411 tests
+  passed / 13 skipped, production build OK on the local-DB env. NOT done and NOT claimed:
+  the end-to-end loop script + test-data manifest/cleanup script, browser checks of the new
+  dialogs / /admin/logs / footer, CHANGELOG. The AuditLog migration (prisma/migrations/
+  20261113000000_add_audit_log) is NOT applied to Supabase: /admin/logs shows a clear message
+  until the user runs npx prisma migrate deploy against it; everything else works without it
+  (audit writes fail quietly). The user's :3000 dev server is stopped; test DB stopped.
+
+- **CORRECTION (status check)**: an earlier note here claimed a SECOND aXet session was
+  working on request #18. That was WRONG. All of the #18 work (confirm dialogs, audit log,
+  footer/version) was done by THIS session; the file times match, and the only other
+  processes were the app itself and my own test DB. Nothing is blocked by another session.
+  STATE: all #18 work is UNCOMMITTED; tsc + eslint clean; full unit suite 411 passed / 13
+  skipped. NOT done yet: the end-to-end loop + test-data manifest/cleanup script, a
+  production build on this tree, browser checks of the new dialogs / /admin/logs / footer,
+  CHANGELOG, commit and the git tag. The tag will be v0.0.1 (matches package.json 0.0.1),
+  not the v0.0.1-alpha written in the second plan entry below. The user's :3000 dev server
+  is STOPPED (I killed it); my local test DB is still running on :5544.
+
+- **Plan (user #18, ALPHA 0.0.1 release, user is busy - work autonomously)**:
+  (1) replace EVERY window.confirm/alert/prompt with our Dialog (shared ConfirmDialog);
+  (2) full end-to-end loop on the LOCAL test DB (never Supabase): temp users for all 3
+  roles with temp passwords + forced password change, projects, members, admin
+  assignment, tasks, comments, labels, filters/kanban/CSV/stats/my-tasks, leave/remove,
+  deletes; log every user/project created in a manifest file so it can be removed
+  later (+ cleanup script); (3) audit/error log: new AuditLog table (migration file,
+  applied to LOCAL only), best-effort recordAudit(), instrument login/admin/project/
+  error paths, super-admin-only /admin/logs page + a "Logs" menu item; (4) footer
+  "Developed by John Doe" + version tag (package.json 0.0.1-alpha, /api/version);
+  (5) FULL validation (tsc, eslint, full vitest, build, e2e, browser), fix failures,
+  commit + git tag v0.0.1-alpha, NO push - report for the user to verify. Supabase NOT
+  touched: the AuditLog migration must be applied to it before the Logs page works there.
+- **Status**: in progress.
+
+- **Plan (user request #18, ALPHA 0.0.1, user is busy/AFK - decide, do not ask)**: (1) Replace
+  EVERY window.confirm/alert/prompt with one shared ConfirmDialog (our Dialog), incl. all delete
+  buttons (task, comment, label, member, leave, remove admin, project Settings delete...). (2) Full
+  end-to-end run on the LOCAL throwaway DB (NOT the real/Supabase DB): temp SUPER_ADMIN/ADMIN/USER
+  accounts, create + assign projects, every API function; every temp user/project recorded in a
+  MANIFEST (docs/test-data/) + a cleanup script, so the user can remove them "one day". (3) Audit /
+  error log: new AuditLog table (additive migration, hand-written + verified, applied to LOCAL only),
+  fail-safe writer, hooks for API 5xx errors, login failures/lockouts and admin actions, and a
+  super-admin-only "Audit log" menu + /admin/logs page (levels, search, paging; DB-down errors can
+  only reach the console -> link/notes). (4) Footer "Developed by John Doe" + small version tag
+  (package.json 0.0.1 + short git SHA on Vercel) in the root layout; git tag v0.0.1; CHANGELOG. (5)
+  Full tsc + eslint + full vitest + build + the e2e; fix failures; commit everything + annotated tag
+  v0.0.1 LOCALLY; NEVER push; report for the user to verify. Supabase is never touched by me; the
+  new migration must be applied to Supabase by the user BEFORE the audit page works online.
+- **Status**: in progress (step 1: audit all alerts).
+
+- **Plan (user feedback #17, delete user dialog)**: Admin console > Users > Delete uses
+  window.confirm (browser alert). Replace with a proper Dialog in the same style as the
+  Delete project dialog (red Delete button, Cancel, no X, fade out) but WITHOUT typing the
+  username. New components/admin/delete-user-dialog.tsx + wire into user-role-manager.tsx
+  with the same keep-mounted/per-opening-key pattern. tsc only, no suites; real-browser
+  check on the LOCAL test DB.
+- **Status**: done, not committed; tsc + eslint clean; no unit suites. NEW components/admin/
+  delete-user-dialog.tsx (same look as Delete project: Dialog, no X, Cancel + red "Delete
+  user" ActionButton, fade-out; description names the account; NO typing step as asked;
+  shows the server's error text inside the dialog and stays open). user-role-manager.tsx:
+  window.confirm and the old deleteUser() removed; Delete button opens the dialog (same
+  keep-mounted + per-opening key pattern as edit/reset). REAL CHROME, real login as super
+  admin, LOCAL test DB (17/17): own row has no Delete; real dialog (no native alert ever);
+  names the account; Cancel and Escape delete nothing; a user who still owns a project is
+  refused with "This user still owns one or more projects..." shown as a red line inside
+  the dialog (dialog stays open, button usable again, user kept); a normal delete removes
+  the row from the table and the DB, others untouched; screenshots looked right. HONEST
+  NOTE: my first run showed 16/16 but one check was a FALSE PASS (matched the word
+  "project" in the dialog's own description while the dev server was still compiling the
+  route; screenshot showed "Deleting..."); I fixed the check to wait for the real error
+  line and reran. Not tested: dark mode, the success path for a user who is a member of
+  several projects. Cleanup: test DB + :3400 server stopped, temp files deleted, user's
+  :3000 dev server restarted (shell 1EE, original .env).
+
+- **Plan (user feedback #16, create project on admin console)**: Admin console >
+  Projects section needs a "+ New project" button that opens the SAME popup as the
+  dashboard (components/create-project-dialog.tsx: name + pick members). Reuse that
+  component (do not copy it): pass it the list of other users from the admin page,
+  put it in the Projects section header. Check where it redirects after creating
+  (dashboard version goes to the new project). tsc only, no suites.
+- **Status**: done, not committed; tsc + eslint clean; no unit suites. admin/page.tsx:
+  Projects heading row now has the existing CreateProjectDialog (the SAME component
+  as the dashboard: "+ New project" -> Create project popup, name + Assign people),
+  fed with every user except the signed-in admin. create-project-dialog.tsx got one
+  optional prop stayOnPage (default false = dashboard unchanged: jumps into the new
+  project); admin passes true = stays on /admin and refreshes so the project appears
+  in the list (my choice; the user did not specify). REAL CHROME, real login as super
+  admin on the LOCAL test DB (11/11, after fixing a bug in my own check script that
+  skipped the last check on the first run): button in the Projects header row; popup
+  = Create project with name field + people list (other user listed, admin not);
+  covers the screen; empty name refused; create -> stays on /admin, project listed,
+  2 members (admin + picked person), private schema created; reopened popup empty;
+  the dashboard popup still jumps into the new project. Screenshot looked right.
+  Cleanup: test DB + :3400 server stopped, temp files deleted, user's :3000 dev
+  server restarted (shell 1E4, original .env). Not tested: dark mode, many users in
+  the people list.
+
+- **Plan (user report #15, landing page flashes Log in)**: Signed in, visiting / shows
+  a glimpse of the logged-out buttons (Log in / Join us) and then switches to "Go to
+  dashboard". Suspected cause: components/hero-actions.tsx treats every status other
+  than authenticated (including "loading", the first moments before the session is
+  known) as signed out. Fix: render a same-size placeholder while loading so nothing
+  wrong is shown, then the right buttons. Check components/providers.tsx too. tsc only,
+  no suites.
+- **Status**: done, not committed; tsc + eslint clean; no suites. CAUSE (confirmed):
+  components/hero-actions.tsx treated every status except "authenticated" - including
+  "loading" (session not known yet) - as signed out, so a signed-in visitor first saw
+  Log in + Join us; the page is prerendered, so the server HTML had them too. FIX:
+  status loading -> a same-height skeleton placeholder (role=status, aria-label
+  "Checking your session"); the resolved buttons fade in (animate-fade-in). REAL CHROME
+  on :3000, faked session reply delayed 1.6 s (no login/DB): signed in = [placeholder]
+  -> Go to dashboard, and Log in / Join us were NEVER shown; signed out = [placeholder]
+  -> Log in + Join us, Go to dashboard never shown; the server HTML has none of the three
+  buttons. Side effect: for the 1-3 s the session lookup takes (it hits the DB) the
+  visitor sees a grey placeholder instead of buttons. Same pattern NOT checked on the
+  other pages (nav already hid its account area while loading).
+
+- **Plan (user feedback #14, admin delete project)**: Admin console > Projects has no
+  Delete project button. Add one per project row, with a type-the-project-name
+  confirmation dialog (Delete stays disabled until the typed name matches exactly;
+  server re-checks nothing new but DELETE /api/projects/[slug] already exists, so
+  check it and its permissions first). Reuse components/dialog.tsx + ActionButton,
+  refresh the list after. tsc only, no suites; verify in real Chrome on the LOCAL test
+  DB only (never Supabase).
+- **Status**: done, not committed; tsc + eslint clean; ONLY the new route test file run
+  (9/9, not the full suite). NEW: src/app/api/admin/projects/[slug]/route.ts DELETE
+  (SUPER_ADMIN only, 401/403, rate limit 10/min, body {confirmName}; 400 if empty or
+  not exactly the project name (case-sensitive, surrounding spaces ignored), 404 if
+  unknown; deletes the project ROW first (members/admin assignments cascade) then drops
+  the private schema; if only the drop fails it logs and still returns ok). The
+  existing DELETE /api/projects/[slug] (project Settings page) is UNCHANGED and still
+  has no typed-name check. NEW components/admin/delete-project-dialog.tsx (type-the-
+  name confirmation, Delete disabled until it matches, red ActionButton, no X, Enter
+  submits, shows server errors) and project-admin-manager.tsx got a red "Delete
+  project" button per project row, keep-mounted dialog + per-opening key. REAL CHROME,
+  real login as super admin on the LOCAL test DB (23/23): button present; Delete
+  disabled when empty / wrong case / one char short; Cancel deletes nothing and a
+  re-open starts empty; server refuses a wrong or missing name (400) even when called
+  directly; exact name -> project vanishes from the list, row gone from DB, its
+  schema dropped, the OTHER project and its schema untouched, deleted project's API
+  returns 404; a normal user gets 403 even with the right name; screenshots looked
+  right. Never touched Supabase. Not tested: dark mode, a project with real tasks/
+  comments/labels (schema drop is CASCADE), extremely long names. Cleanup: test DB
+  stopped, :3400 server stopped, temp files deleted, the user's :3000 dev server
+  restarted (shell 1D6, original .env).
+
+- **Plan (user feedback #13, persistent project navbar)**: The project navbar is
+  drawn by each page (board, settings, my-tasks, board/[issueId]) so it unmounts and
+  reloads on every click, and [slug]/loading.tsx + [slug]/board/loading.tsx even draw
+  a fake grey bar in its place. User: it must PERSIST between pages of the same
+  project, but change when going between the admin site nav and a project nav. PLAN:
+  new src/app/[slug]/layout.tsx (own Suspense + skeleton, looks up auth/project/
+  canManage; renders NO nav for signed-out, must-change-password, unknown project or
+  non-members so the Join page stays as is); ProjectNav derives "active" from the URL
+  (no active prop); remove <ProjectNav> from the 4 pages and the fake nav block from
+  the 2 loading files. VERIFY in real Chrome with a real login on the LOCAL test DB
+  (needs stopping the :3000 server I started, then restarting it on the original
+  .env): same header DOM node survives Board -> My tasks -> Project Settings clicks.
+  tsc + eslint only, no suites.
+- **Status**: done, not committed; tsc + eslint clean; production build OK (all routes
+  incl. [slug]/my-tasks) run against the LOCAL DB env. NEW src/app/[slug]/layout.tsx:
+  own Suspense + skeleton, async loader does auth + project + canManage and renders
+  ProjectNav only for signed-in, password-set, existing-project MEMBERS/MANAGERS (so
+  non-members keep the Join page without a menu; signed-out/unknown project render
+  nothing and the pages redirect/404 as before). ProjectNav lost its active prop and
+  reads the section from usePathname(). <ProjectNav> and the fake grey nav block
+  removed from the 4 pages and [slug]/loading + [slug]/board/loading. REAL CHROME,
+  real login, LOCAL DB (dev on :3400, demo data cleaned): main navbar on /dashboard =
+  [My tasks, Admin console]; project navbar = [My tasks, Project Settings]; the SAME
+  header DOM element survived board -> My tasks -> Project Settings -> project name
+  -> board (headers=1 each time); non-member sees Join page with 0 headers; signed-out
+  visits redirect to /login (client-side redirect a few seconds after the first load
+  in dev - my first check just did not wait long enough). Screenshot looked right.
+  Swapping admin nav <-> project nav needs a different layout group, so it changes
+  as the user asked (not clicked through; no link leads from a project back to the
+  main site any more, only full page loads were compared). NOT verified: Project
+  Settings / My tasks pages with a manager vs plain member; dark mode. The dev-only
+  "crypto.getRandomValues while prerendering" message still shows for /[slug]/board in
+  dev but the production build passes. Cleanup done: test DB stopped, :3400 server
+  stopped, temp scripts deleted, the user's :3000 dev server restarted (shell 1CC,
+  original .env = Supabase).
+
+- **Plan (user feedback #12)**: (1) Rename "Settings" to "Project Settings" in the
+  project navbar. (2) "My tasks" inside a project must be PER PROJECT: new page
+  /{slug}/my-tasks = my open tasks in THAT project only, rendered with the project
+  navbar (so there is always a way back); the project navbar My tasks link points
+  there and highlights. The main navbar (super admin) My tasks stays the
+  cross-project /my-tasks. Reuse listOpenIssuesAssignedTo. tsc only, no suites.
+- **Status**: done, not committed, NOT opened logged in (needs a real login); tsc + eslint
+  clean, no suites. components/project-nav.tsx: label "Settings" -> "Project Settings";
+  "My tasks" now links to /{slug}/my-tasks (highlighted when active=my-tasks; active
+  type extended). New src/app/[slug]/my-tasks/page.tsx: same auth/member checks as the
+  board (non-members redirect to the board), shows ONLY this project's open tasks
+  assigned to the user (listOpenIssuesAssignedTo, soonest due first) inside the
+  project navbar, empty state links to the board; task rows link to the task page.
+  Main navbar My tasks (super admin) still goes to the cross-project /my-tasks. Dev
+  server serves the route (200, no build error). Overdue uses the server date.
+  Inherits [slug]/loading.tsx as its loading screen.
+
+- **Plan (user feedback #11c, explicit navbar layout)**: User: nothing visibly moved.
+  Wants: MAIN navbar (super admin): LEFT next to logo + "Project Tracker" = menu
+  [My tasks, Admin console]; RIGHT = [theme toggle, username, Sign out]. PROJECT
+  navbar (/{slug}/board etc.): LEFT next to project name = [My tasks, Settings];
+  RIGHT = same as admin [theme, username, Sign out]. Edit components/nav.tsx and
+  components/project-nav.tsx. Replace the old "Admin Dashboard" + "Admin" links with
+  one "Admin console" (/admin). tsc only, no suites.
+- **Status**: done, not committed; tsc + eslint clean; no suites. WHY the user saw no
+  change before: in the MAIN navbar My tasks/Admin links sat in the RIGHT group
+  (before the username) and my earlier edit only touched the project navbar.
+  components/nav.tsx now: LEFT = logo + "Project Tracker", then menu [My tasks,
+  Admin console (SUPER_ADMIN only, /admin, highlighted on /admin*)]; RIGHT = theme
+  toggle, username chip, Sign out (or Log in when signed out). The old "Admin
+  Dashboard" (/dashboard) and "Admin" links are gone. Menu and account area stay
+  hidden on /login while authenticated (the earlier no-flash fix). components/
+  project-nav.tsx: LEFT = project avatar+name, then [My tasks (/my-tasks), Settings
+  (managers only)]; RIGHT = theme, username, Sign out. VERIFIED in real Chrome on
+  :3000 with a faked session (no login/DB): SUPER_ADMIN -> LEFT Project Tracker, My
+  tasks, Admin console / RIGHT user chip, Sign out; USER -> same without Admin
+  console; screenshot looked right. NOT verified: the project navbar (needs a real
+  login to open a project page; code-reviewed only). Consequences to tell the
+  user: super admin has no navbar link to /dashboard (project list) any more - only
+  the logo -> home -> "Go to dashboard" button and the post-login redirect; "My
+  tasks" in a project navbar leaves the project site for the main site.
+
+- **Plan (user feedback #11b)**: Project navbar: remove the Dashboard button (the
+  project name already links to the board) and move the nav links to the LEFT side
+  next to the project name. Interpretation: Settings (managers) moves left beside
+  the name; theme toggle, username and Sign out stay on the right. components/
+  project-nav.tsx only. tsc only, no suites.
+- **Status**: done, not committed, not seen in a browser; tsc + eslint clean.
+  components/project-nav.tsx: Dashboard link removed; the left group is now
+  [project avatar + name (links to the board)] + [Settings, managers only]; the
+  right group keeps theme toggle, username chip and Sign out. Assumption: "move to
+  the left" = Settings moves next to the name. The earlier #11 change (Dashboard ->
+  /{slug}/board) is superseded.
+
+- **Plan (user feedback #11)**: On /{slug}/settings the project navbar "Dashboard"
+  link goes to /dashboard (the main/admin dashboard). User wants it to go to the
+  PROJECT's own dashboard. The project has no /{slug}/dashboard route; its home
+  is /{slug}/board (tasks + stats), so point the link there. Edit
+  components/project-nav.tsx only. tsc only, no suites.
+- **Status**: done, not committed, not seen in a browser; tsc + eslint clean.
+  components/project-nav.tsx: the "Dashboard" link now goes to /{slug}/board (the
+  project's own dashboard: tasks + stats) and is highlighted when active=board,
+  same style as Settings. Side effect to tell the user: project pages no longer
+  have any link back to the main /dashboard project list (the project name link
+  and Dashboard now both point at the board). Used by /{slug}/board, /{slug}/settings
+  and /{slug}/board/{issueId} (all three render ProjectNav).
+
+- **Plan (user feedback #10)**: Remove the yellow left-edge bar from the project
+  cards (JSX + .project-card-edge css). Summary tiles are too dark grey: lighten
+  them ~20% (tile tint and text grey). tsc only, no suites.
+- **Status**: done, not committed, not seen in a browser; tsc + eslint clean.
+  project-list.tsx: left accent bar element removed (card padding back to p-5);
+  globals.css: .project-card-edge rules removed. dashboard-summary.tsx: tile tint
+  .035 -> .028 (light) / .05 -> .04 (dark), number text-foreground/80 -> /65,
+  label + hint text-muted -> text-muted/80 (about 20% lighter each). Open arrow
+  button, hover lift and heading kept.
+
+- **Plan (user feedback #9, dashboard cards vs summary)**: The clickable project
+  cards look too much like the summary tiles above (same surface card style, tight
+  spacing), so users cannot tell they are clickable. DOING: make the summary tiles
+  flat/informational (no card shadow, tinted, smaller), add a "Your projects"
+  heading with more spacing, and give project cards clear affordances: persistent
+  Open arrow button, accent edge, hover lift + accent border + arrow slide,
+  pointer cursor, focus ring. tsc only, no suites.
+- **Status**: done, NOT seen in a browser (dashboard needs a real login, and a second
+  dev server cannot run next to the user's :3000 one), not committed; tsc + eslint
+  clean. CAUSE: cards and tiles shared the same surface-card look, and the card's
+  only affordance (arrow) was opacity-0 until hover. FIX: summary tiles are now
+  flat tinted chips (no shadow/border, smaller muted numbers, 40 px gap below);
+  new "Your projects" heading + hint "Click a project to open it in a new tab";
+  project cards: stronger resting shadow, yellow accent edge on the left (grows on
+  hover), an always-visible circular Open arrow button that fills yellow and nudges
+  on hover/focus, hover lift (existing card-lift), pressed state, keyboard focus
+  ring, aria-label "Open project X", cursor-pointer. CSS in globals.css (.project-
+  card*). Served CSS contains the new rules. Not checked: dark mode, narrow screens.
+
+- **Plan (user feedback #8, dashboard summary text)**: On /dashboard the personal
+  summary ("N spaces you can open", "you manage X with full control") sits UNDER
+  the search bar and changes with the search. It must sit ABOVE the search bar and
+  NOT depend on the search/page (always the user's real totals). Find where it is
+  rendered, compute the totals independent of ?q=/page, move it above the
+  search input. tsc only, no suites.
+- **Status**: done, not committed, NOT seen logged in (tsc + eslint clean; no suites).
+  CAUSE: the three tiles (Projects / You manage / Collaborators) were drawn inside
+  ProjectList, under the search bar, only when no search and page 1, and the
+  numbers came from the 20 projects of the CURRENT PAGE (so wrong with >20
+  projects; "Collaborators" even said "across this page"). FIX: new
+  lib/dashboardSummary.ts (account-wide totals, independent of ?q=/page:
+  super admin = count of all projects + distinct members; others = their
+  member/admin projects, managed = ProjectAdmin rows when role ADMIN,
+  collaborators = DISTINCT people across those projects) and new components/
+  dashboard-summary.tsx (tiles + skeleton) rendered in dashboard/page.tsx ABOVE
+  the search input in its own Suspense (no key, so it does not flash on every
+  keystroke). Tiles removed from project-list.tsx. Changed on purpose: the
+  Collaborators number is now distinct people (before: sum of member counts,
+  which double-counted people in several projects) and includes the user. The
+  queries were NOT run against a database (no logged-in check, local DB off).
+  Side effect: the summary queries re-run on every search navigation (3 small
+  queries, results unchanged).
+
+- **Plan (user report #7)**: Login as "admin" shows "An unexpected error occurred
+  while logging in" (the unexpected-error branch of authorize(), i.e. NOT a
+  DB-unreachable error and NOT wrong password). DOING (read-only): read the dev
+  server log for the real exception, re-check the DB connection, then find which
+  of my recent edits (useAppRouter / ActionButton / login changes) or the DB
+  could cause it. No test suites, no DB writes.
+- **Status**: partly fixed, not committed, NOT unit-tested (user: no tests while
+  reviewing); tsc + eslint clean. ROOT CAUSE of the login error: the database
+  connection timed out (dev log: "Connection terminated due to connection
+  timeout" in checkRateLimit, i.e. before any password check). Read-only checks:
+  3 direct connects timed out at 5 s; ~minutes later a real login request to
+  :3000 got an answer in 3.9 s ("Invalid username or password" for a made-up
+  user), so the connection is SLOW/FLAKY from this PC (earlier today the same
+  check took 2.4 s), not permanently down; cause on the network side unknown
+  and not changeable from the project. PROJECT BUG FIXED: src/lib/apiError.ts
+  isDbConnectionError missed pg-pool timeouts (no error code), so login said
+  "unexpected error" instead of "Cannot reach the database". Now also matches
+  connection messages (connection terminated / connection timeout / timeout
+  expired / ECONN* / ENOTFOUND ...) anywhere in the cause chain + ECONNRESET
+  code. The new message path was NOT reproduced end to end (database happened
+  to answer). ALSO: components/dialog.tsx onExited now via a ref (the log's
+  "useEffect changed size" warning was a hot-reload artifact of my earlier dep
+  edit; refresh clears it). OPEN CONCERN (not fixed, not verified): dev log
+  shows "Route X: Next.js encountered the unstable value crypto.getRandomValues()
+  while prerendering" (blocking-prerender-crypto) for /admin from 00:40 (right
+  after I added admin/loading.tsx) and for /my-tasks, /admin/users/new,
+  /change-password, /dashboard, /[slug], /[slug]/settings, /[slug]/board from
+  01:15 (after the loading screens/progress bar). Pages still return 200 in dev.
+  In a production build this message can be a hard error, so run npm run build
+  BEFORE committing/pushing (it overwrites .next, so stop the dev server first).
+
+- **Plan (user feedback #6, dialog close animation)**: Dialogs animate in but close
+  instantly. Add an exit animation (fade + scale out, ~180 ms) in the shared
+  components/dialog.tsx so every dialog gets it (sign out, create project,
+  create task, edit/reset user). Check how each caller closes it (some render
+  <Dialog open> only while a state is set, so the parent unmounts it and no exit
+  can play). Respect prefers-reduced-motion. tsc only, no suites.
+- **Status**: done, not committed (tsc + eslint on all of src clean; no suites).
+  components/dialog.tsx keeps itself mounted for 180 ms after open turns false
+  and plays new fade-out / pop-out keyframes (globals.css: --animate-fade-out,
+  --animate-pop-out), overlay is pointer-events-none while closing; new optional
+  onExited callback. Create project + Create task now clear their form in
+  onExited (they used to blank it the instant they closed, which would have
+  shown mid-animation). Edit user / Reset password (admin) used to be unmounted
+  by the parent on close: user-role-manager now keeps them mounted with an open
+  flag + a per-opening key (fresh form each time, no stale "password reset"
+  screen); both dialogs got an open prop. REAL CHROME (user's :3000 server,
+  faked session, sign-out dialog): Cancel, Escape and backdrop click all fade
+  out (5 intermediate opacity samples) and the dialog is removed ~230 ms after
+  the click; reopening works. NOT tested: create project / create task /
+  edit user / reset password dialogs in a browser (need a real login) - same
+  Dialog component; prefers-reduced-motion not tested (global rule shortens
+  animations).
+
+- **Plan (user feedback #5, loading feedback EVERYWHERE)**: My tasks (and others)
+  freeze with no feedback before the new page appears. User wants EVERY
+  navigation/button/action audited so nothing looks hung. PLAN: (1) list every
+  page route + which has loading.tsx, (2) list every client action (fetch /
+  router.push / signOut / links) and whether it shows a pending state,
+  (3) fix: loading.tsx for every server page that awaits data, a global top
+  progress bar for ALL link navigations (so even instant-looking clicks give
+  feedback), pending/disabled states for actions that lack them, (4) tsc only,
+  verify skeleton markup is served; no test suites, no DB writes.
+- **Status**: BUILT, not committed, tsc + eslint clean on all of src; NO test suite or
+  build run (user: no tests while reviewing). Shared pieces: (1) components/
+  page-loading.tsx + (site)/loading.tsx (fallback for every page without its
+  own: my-tasks, change-password, join, ...) + admin/users/new/loading.tsx;
+  existing loading files kept (admin, dashboard, [slug], [slug]/board). First
+  HTML of /my-tasks, /admin, /admin/users/new, /change-password, /dashboard and
+  the [slug] pages all contain a skeleton. (2) Global top progress bar
+  (components/navigation-progress.tsx + .nav-progress css, mounted in the root
+  layout inside Suspense): starts on any Next <Link> click (document click
+  listener, relies on Link calling preventDefault), shows after 120 ms, crawls,
+  completes+fades; also runs for code navigations. (3) lib/useAppRouter.ts: drop-in
+  for useRouter in all 19 places (push/replace/refresh run in a transition and
+  mark navigationBusy synchronously until the new page is shown, 15 s safety),
+  useNavigationBusy() so buttons stay busy instead of flashing idle. (4)
+  components/action-button.tsx (disabled + spinner + aria-busy, auto-busy for
+  async onClick) now used by: login, sign-out confirm, leave/join project,
+  create project, change password, create user, project settings Save/Delete,
+  task Save/Delete, and the new ExportCsvButton (CSV download used to be a plain
+  link with no feedback). REAL CHROME on the user's :3000 server with a faked
+  session and every page request delayed 1.5 s: bar active 150 ms after the
+  click, opacity 1, cleared when the page arrived (screenshot showed it).
+  NOT proven: the skeleton appearing mid-navigation (my fake delay held back
+  even the response headers, which a real server does not); skeleton presence
+  is proven only via the first-HTML check. In dev, a route's FIRST visit is
+  compiled on demand and nothing can render until it is done - the bar covers
+  that gap. NOT tested logged in: idle-flash fixes on Leave/Create project/
+  Change password/Create user/Save, ExportCsvButton download, filters/search
+  bar. Other buttons keep their own existing busy labels (kanban, comments,
+  labels, member/admin managers, edit-user dialogs).
+
+- **Plan (user feedback #4, admin console freeze)**: Clicking "Admin console" on
+  /dashboard looks frozen until /admin appears. Find what /admin does before it
+  can render (server queries, no loading.tsx?), then give instant feedback:
+  a loading skeleton for /admin (route loading.tsx) and/or a pending state on
+  the link. Smallest change, tsc only, no suites, no DB writes.
+- **Status**: done, not committed, NOT seen in a browser as a logged-in admin. CAUSE:
+  /admin had no loading.tsx; the page awaits auth() + 3 Prisma queries (users,
+  projects with admins, 50 assignments) before sending any HTML, so the click
+  showed nothing. FIX: new src/app/(site)/admin/loading.tsx (skeleton shaped
+  like the page: title, users, projects, history; role=status). Next.js shows it
+  immediately on navigation. Checked: tsc clean; the dev server's /admin HTML
+  contains the skeleton markup. Other routes still WITHOUT a loading screen
+  (not asked, not changed): admin/users/new, change-password, my-tasks,
+  [slug]/settings, [slug]/board/[issueId].
+
+- **Plan (user feedback #3c)**: User says the popup still only shows on the
+  navbar (must cover the whole site) and the X is redundant because Cancel
+  exists. DOING: (1) Dialog gets an optional hideClose prop (default keeps the X
+  for the other dialogs); sign-out passes it, (2) re-verify in real Chrome that
+  the overlay covers the whole viewport, also when the page is scrolled, and
+  that the dev server really serves the portal version (my earlier check did
+  show 1280x720, so a stale browser tab is the likely reason). tsc only, no
+  suites.
+- **Status**: done, not committed. Dialog has an optional hideClose prop (default
+  false, so create project / create task / edit user keep their X); the
+  sign-out popup passes hideClose (only Cancel + Sign out). Re-measured in real
+  Chrome on the running :3000 dev server with a faked session reply (no login,
+  no DB, nothing signed out): overlay is a direct child of body at 0,0 1280x720
+  both at the top and when scrolled 380px, dialog centred at 640,360, no X,
+  buttons [Cancel, Sign out]. So the served code is the portal version; if the
+  user still sees the navbar-only backdrop, their tab is running old code
+  (needs a hard refresh) - NOT reproduced here. Not tested on authenticated
+  pages (dashboard/project navbar need a real login) - same component/path.
+  tsc clean; screenshots + script deleted.
+
+- **Plan (user feedback #3b)**: User says the sign-out confirmation popup looks
+  extremely bad. DOING: render it for real (LOCAL throwaway DB + dev server on
+  :3400 + screenshot, light and dark; user's :3000 server and Supabase not
+  touched), see what is wrong, redesign the popup (a dedicated confirm dialog,
+  not the generic form Dialog), re-screenshot. No test suites.
+- **Status**: done, not committed. ROOT CAUSE (measured in real Chrome): the Sign
+  out button lives inside the sticky header, which has backdrop-filter (.glass);
+  that makes the header the containing block of the dialog's position:fixed
+  overlay, so the backdrop was 1280x60 (just the navbar) and the dialog sat at
+  y=-57 (title cut off, glued to the top). FIX: components/dialog.tsx now
+  renders through createPortal into document.body (also protects every other
+  Dialog). After: overlay 1280x720, dialog centered, light + dark screenshots
+  checked. Checked usages: no Dialog is inside a form, so the portal is safe
+  for create project / create task / edit user. Verified by faking the
+  /api/auth/session reply in the browser (no login, no DB writes, nothing
+  signed out); screenshot + script deleted; local test DB stopped. tsc clean.
+  Not done: popup polish beyond the layout fix (icon etc.), focus trap.
+
+- **Plan (user feedback #3, sign-out confirmation)**: Sign out signs the user out
+  on one click. Add a confirmation dialog (reuse components/dialog.tsx) in the
+  navbar and in the project navbar (both have Sign out): Cancel / Sign out,
+  button shows a busy state while signing out. Smallest change, tsc only, no
+  tests.
+- **Status**: done, UNTESTED in a browser, not committed (tsc only). New small
+  shared components/sign-out-button.tsx (button + confirm Dialog: Cancel /
+  Sign out, busy "Signing out...", Esc and backdrop close it unless signing
+  out) used by nav.tsx and project-nav.tsx (both previously called signOut on
+  one click). signOut still redirects to "/". Known: Dialog has no focus trap
+  (pre-existing open finding).
+
+- **Plan (user feedback #2, login transition)**: After a successful login the
+  button flips back to "Log in" (idle) and the page jumps to /dashboard with no
+  transition; the navbar also shows the user info while the login page is still
+  on screen. FIX (small, no tests): login keeps its "signing in" state after
+  success (never returns to idle), fades the card out briefly before navigating;
+  navbar hides the user info/Log in link while on /login. tsc only.
+- **Status**: done, UNTESTED in a browser, not committed (tsc only). Cause: onSubmit
+  returned right after router.push, so isSubmitting went false (button back to
+  "Log in") while the dashboard was still loading; the navbar reads the session
+  immediately and showed the user on the login page. Fix: login/page.tsx has a
+  redirecting state (button stays disabled "Logging in...", page fades out over
+  220 ms, then push+refresh; reset in the useLayoutEffect cleanup so coming
+  back to /login is normal); nav.tsx hides the account area while the path is
+  /login and the session is authenticated (so a signed-in user opening /login
+  sees no Log in/user flash either). Known: login now waits 220 ms longer.
+
+- **Plan (user order, angry)**: REVERT everything back to the latest UI fix and
+  start again. Interpreted as: remove ALL database-connection work I added
+  (HTTP adapter, systemCerts, prisma.ts switch, README/.env.example token
+  text, the @prisma/driver-adapter-utils dep line, fake API script and its
+  tests) from the tree, KEEP the login useLayoutEffect form fix (last UI fix
+  the user accepted) and PROGRESS.md; keep the removed work recoverable in a
+  named git stash; then restart ONE dev server. No tests, no network changes.
+- **Status**: done. Connection work moved into git stash@{0} "supabase-https-
+  adapter" (stash@{1} still holds the earlier Neon work); .env.example reset.
+  Tree = last commit (de5ae59) + the login useLayoutEffect fix only; tsc clean.
+  ONE fresh dev server running (shell 179, http://localhost:3000, /login 200).
+  The dev server now reports network address 192.168.0.181 (was 192.168.1.109),
+  i.e. the PC is on a different network than during the failures. With the
+  ORIGINAL .env and NO connection code, a read-only check now CONNECTS: db
+  postgres, 5 users, 2.4 s. So the database is reachable again with the
+  project exactly as it was. Nothing outside the project folder was changed by
+  me. Not run: any test suite, build.
+
+- **Plan (user: "now try again")**: User presumably added SUPABASE_ACCESS_TOKEN to
+  .env. DOING: (1) confirm the variable is present (never print it), (2) one
+  read-only SELECT against the REAL Supabase endpoint with the app's adapter
+  code path (shape/status check), (3) restart my dev server shell so it reads
+  .env, (4) check /api/auth/session and /login. No writes to Supabase, no test
+  suites.
+- **Status**: blocked on the token. SUPABASE_ACCESS_TOKEN is NOT in .env (last
+  modified 2026-10-22), not in .env.local, and not in the process environment,
+  so the app still uses the normal Postgres pool and still cannot connect.
+  Nothing run against the real Supabase API. Waiting for the user to add the
+  token line to .env and save.
+
+- **Plan (user said YES: build the Supabase-over-HTTPS connection)**: Custom Prisma
+  driver adapter that sends SQL to the Supabase Management API
+  (POST https://api.supabase.com/v1/projects/<ref>/database/query, port 443)
+  with a personal access token the USER puts in .env as SUPABASE_ACCESS_TOKEN
+  (I never read it). Auto-selected ONLY when that variable is set, so Vercel/
+  production (no token) keeps the normal pg pool; local test DB unchanged.
+  Node must trust the Windows cert store (Zscaler re-signs HTTPS) - verified
+  earlier with ws. Known limits to tell the user: beta API, 120 req/min, no
+  real transactions (statements run one by one, not atomic), column types are
+  inferred from JSON. Steps: (1) check fetch->api.supabase.com passes (expect
+  401 without token), (2) read driver-adapter-utils types + adapter-pg for the
+  type mapping, (3) src/lib/supabaseHttpAdapter.ts + unit tests with mocked
+  fetch, (4) wire into prisma.ts, (5) .env.example/README, (6) tsc + only the
+  new tests, no full suite while the user is reviewing, (7) real test once the
+  user adds the token. Only project files. Do NOT mention Neon/IPv6 to user.
+- **Status**: BUILT + PROVEN LOCALLY, waiting only for the user's token. Adapter
+  src/lib/supabaseHttpAdapter.ts, src/lib/systemCerts.ts, prisma.ts switch
+  (HTTP adapter ONLY when SUPABASE_ACCESS_TOKEN is set; Vercel never sets it),
+  dep @prisma/driver-adapter-utils, .env.example + README section, scripts/
+  fake-supabase-api.mjs (stand-in endpoint on the LOCAL test DB that formats
+  values like Supabase postgres-meta: raw timestamp/date strings, safe int8 as
+  number). Verified: tsc clean, eslint clean on new files, 33 unit tests (mocked
+  fetch), and through the adapter against the local stand-in: 13/13 existing
+  projectSchema integration tests + 5/5 new Prisma-model tests
+  (supabaseHttpAdapter.integration.test.ts: create/find/update/count with
+  correct JS types, P2002, P2003, nested writes, interactive transaction,
+  relation count, the real authenticateCredentials login + lockout counter,
+  missing-table error). Full unit suite and build NOT re-run (user said no
+  tests while reviewing). Earlier fetch to api.supabase.com returned 401 via
+  the Windows cert store, so the HTTPS path to the real API is open.
+  NOT VERIFIED against the real Supabase endpoint: actual response body
+  shape/status (docs say 201 + JSON; adapter accepts array, {result}, {rows}),
+  latency, and the 120 req/min limit under real page loads (each page = several
+  queries; session checks add more). Real run needs the user's token in .env
+  (SUPABASE_ACCESS_TOKEN) + restart npm run dev; then check /api/auth/session
+  and a real login. Local test DB + stand-in API stopped. All uncommitted
+  (adapter work + login useLayoutEffect fix).
+- **Plan (user)**: User asks WHO/WHICH PROGRAM cuts the Postgres connection.
+  READ-ONLY investigation, nothing changed: list running processes/services that
+  look like Zscaler / security agents / VPN, check the Windows proxy settings,
+  and traceroute to the pooler IP to see where the path ends. Report evidence
+  vs guess honestly.
+- **Status**: done (read-only, nothing changed). EVIDENCE: Zscaler Client
+  Connector is RUNNING on this PC (ZSATunnel, ZSAService, ZSAUpm, ZSATray,
+  ZSATrayManager); traceroute hops 2-3 to the pooler are 165.225.230.x (a
+  Zscaler cloud address range); HTTPS certs for supabase/npm/github are issued
+  by Zscaler Inc. Also running: Cisco AnyConnect (vpnagent, ciscod), FortiClient
+  VPN, F5 (F5TrafficSrv), CrowdStrike Falcon, Defender. No Windows/env proxy
+  set. NOT PROVEN: which of these resets the Postgres packet, and what changed
+  since yesterday (mode/policy/data-center change of Zscaler or one of the VPN
+  agents is plausible). Nothing here is changeable from the project folder.
+
+- **Plan (user)**: User says yesterday I fixed something about a large TLS
+  handshake (the ecdhCurve / post-quantum ClientHello fix in src/lib/prisma.ts)
+  and it worked, today it does not. CHECK (read-only): is that fix still in
+  the working tree and HEAD, did any of my commits/edits since touch it, and
+  at which stage today's failure happens (before or after TLS).
+- **Status**: done. The ecdhCurve TLS fix is INTACT: present in the working
+  tree and in HEAD (line 49), no uncommitted change to prisma.ts /
+  retryingPool.ts / next.config.ts / .env, and no commit since 6a9e432 touched
+  the connection files. Today's failure happens BEFORE TLS: the direct host
+  fails at the address lookup (3-5 ms, ENOTFOUND, same with that fix applied);
+  the pooler is reset right after the 8-byte Postgres SSLRequest, before any
+  TLS ClientHello is sent (raw-socket probe), and psql fails the same. So the
+  large-ClientHello fix is not what broke and cannot fix this stage. What
+  changed since yesterday is still unknown. User order: do not use the word
+  IPv6 with them.
+
+- **Plan (user)**: ONLY job now: make the app connect to Supabase from this PC.
+  No frontend talk, no Neon, nothing outside the project folder, no telling the
+  user to change network. DOING: fresh read-only check of both Supabase routes
+  (direct host from .env, IPv4 pooler with the same password held in memory
+  only; .env NOT edited), then decide from the result.
+- **Status**: checked, still blocked. Fresh read-only result: direct host
+  ENOTFOUND; pooler 6543 and 5432 both ECONNRESET (~140 ms). Only project-side
+  route left that stays inside the project and uses normal web traffic (443,
+  proven to pass): Supabase Management API POST /v1/projects/<ref>/database/
+  query (docs: experimental/Beta; auth = personal access token sbp_...,
+  scoped database_read/database_write; body {query, parameters[], read_only};
+  response 201; 120 requests/min per user/project/endpoint, 429 after; no
+  transaction across calls, multi-statement BEGIN..COMMIT in one query string
+  unconfirmed). Would need a custom Prisma driver adapter + a token from the
+  user. Risks: rate limit (a page = several queries), beta API, token power.
+  Not started; asked the user.
+
+- **Plan (user)**: User closed everything on their side; asked me to close any
+  leftover project servers and start ONE dev server for them. DOING: list who
+  listens on :3000/:3400/:5544 (only this project's node/next processes and my
+  throwaway test Postgres), stop leftovers, start one `npm run dev` (.env =
+  original Supabase direct host). No network/system changes.
+- **Status**: done. Found nothing on :3000/:3400; stopped my throwaway test
+  Postgres (:5544, pg_ctl stop). Started ONE dev server (background shell
+  152) on http://localhost:3000; /login serves 200. Login will still show the
+  DB-unreachable message while this PC cannot resolve db.<ref>.supabase.co.
+
+- **Plan (user: "I never touched Neon, I want it like yesterday")**: The Neon/
+  WebSocket driver was MY unrequested workaround; user rejects it. Remove it
+  from the working tree (git stash of only those files so it is recoverable:
+  package.json, package-lock.json, next.config.ts, src/lib/prisma.ts,
+  .env.example, README.md, prisma/fresh-database.sql, scripts/make-admin-sql.mjs,
+  src/lib/dbDriver.ts, src/lib/dbDriver.test.ts), keep the login
+  useLayoutEffect fix, tsc only, then one read-only DB check with the original
+  .env. No network/system changes, no option menus.
+- **Status**: done. Neon/WebSocket work REMOVED from the tree (kept only in
+  git stash@{0} "neon-websocket-workaround"; recover with git stash pop if ever
+  wanted). The git stash command aborted midway on the git-ignored
+  .env.example, so I reverted the 5 tracked files with git checkout and deleted
+  the 4 new files by hand, and rewrote .env.example without the DB_DRIVER lines.
+  Tree is now HEAD (de5ae59) + the login useLayoutEffect fix. tsc clean.
+  node_modules still contains the extra packages (harmless, not in package.json).
+  .env = original direct host. Read-only check just now: still ENOTFOUND for
+  db.<ref>.supabase.co from this PC, so login still cannot reach the DB.
+  Vercel/production is a separate setup and unaffected.
+
+- **Plan (user, angry)**: User says this Wi-Fi allowed IPv4 DB access before, I must
+  have changed something, stop telling them to change network / contact IT.
+  DOING (project folder only): (1) audit what I changed and what the project log
+  says about the old working path, (2) restore .env from
+  .axet-code/tmp/env.before-pooler (undo my pooler edit; it did not help),
+  delete the backup, (3) read-only SELECT 1 with the ORIGINAL .env, (4) if it
+  connects, restart the user's dev server so they can log in. NO network or
+  system changes, no new options menus.
+- **Status**: done. .env RESTORED to the original (direct host
+  db.<ref>.supabase.co:5432, user postgres); backup deleted. Read-only check
+  with the original .env: OS lookup ENOTFOUND (this PC currently has no usable
+  route for that host), so login still fails; nothing in the project causes
+  it. EVIDENCE from this project's own log (PROGRESS.md ~line 1490, written
+  weeks ago, before today): "local network blocks the IPv4-only pooler, so
+  direct-connection was chosen for local .env" - i.e. the old working path was
+  the direct host, never the IPv4 pooler. Things I changed OUTSIDE the project
+  folder this session: a throwaway local Postgres data folder in the tool temp
+  dir (C:\Users\parut.singhapun\.axet-code\tmp\tracker-local-pg), `ipconfig
+  /renew6` (no lasting change; the IPv6 default route was already missing
+  before it), stopping dev-server/test-DB processes of mine, and an attempted
+  elevated Wi-Fi adapter restart whose UAC prompt was cancelled (nothing ran).
+  I could not determine why the route disappeared. The user's dev server on
+  :3000 may hold a cached DB client from the pooler .env and needs a restart.
+  Still uncommitted: Neon/WebSocket driver work + login useLayoutEffect fix.
+
+- **Plan (user report)**: User cannot log in: "Cannot reach the database right
+  now". Diagnose only first (read-only SELECT 1 against Supabase + check the
+  dev server on :3000), find whether it is network, env, or something I
+  changed (the login useLayoutEffect edit cannot cause a DB error). No tests.
+- **Status**: diagnosed, NOT my code. The current Wi-Fi has NO IPv6 (0 default
+  v6 routes). The Supabase direct host (db.<ref>.supabase.co) has only an
+  AAAA record, so this machine cannot even resolve it (ENOTFOUND); the IPv4
+  pooler (6543 and 5432) is reset by the network (ECONNRESET) - same pattern
+  as the earlier outage. Same DB works from Vercel (uses the pooler). Fix
+  options: network with IPv6 (other Wi-Fi / phone hotspot), or test on the
+  local DB with a seeded user. Nothing in the repo or .env was changed.
+  USER pushed back ("it worked before on IPv4"). Deeper probe of the IPv4
+  pooler (3 IPs, ports 6543/5432): TCP connects and stays open; plain bytes
+  get a normal Postgres reply (E = error), but the moment the Postgres
+  SSLRequest packet is sent the connection is RESET (~135 ms) on every IP,
+  while HTTPS to the same host works. So something on this network resets
+  the Postgres TLS handshake over IPv4; earlier today it worked because the
+  PC still had IPv6 (direct host). I did NOT try to bypass the filter (no
+  plaintext Postgres, no packet tricks). Temp scripts deleted.
+  USER insists it MUST work on this Wi-Fi and allowed restart/reboot/
+  whatever. Next: confirm no repo/.env change of mine touches the DB path,
+  then try to restore IPv6 on this PC (ipconfig /renew6, restart the Wi-Fi
+  adapter if elevated), re-run the read-only SELECT 1, then restart the dev
+  server on :3000.
+  USER ORDER: STOP - change NOTHING outside the project folder. (I had run
+  ipconfig /renew6 and tried to restart the Wi-Fi adapter with elevation; the
+  UAC prompt was cancelled, so no adapter/system setting changed. Only
+  ipconfig /renew6 ran.) Temp scripts deleted. USER BELIEF: some project
+  setting makes the IPv4 path fail. Now checking ONLY project files
+  (src/lib/prisma.ts, retryingPool.ts, .env host/port with the password
+  masked) read-only.
+  RESULT (project-only, read-only): .env was last modified 2026-10-22 (not by
+  me) and points at the DIRECT host db.<ref>.supabase.co:5432, which has only
+  an IPv6 (AAAA) record. prisma.ts just reads host/port from .env; it does not
+  pick IPv4/IPv6. A plain pg script that uses none of the project code fails
+  the same way at DNS (ENOTFOUND) before any TLS, so the project code is not
+  the cause. Windows currently has a global IPv6 address but NO IPv6 default
+  route (router fe80::1 is Stale), so IPv6 traffic (even to google) gets
+  ENETUNREACH. The IPv4 pooler path is reset by the network at the Postgres
+  handshake. Nothing outside the project was changed (only ipconfig /renew6
+  ran). The IPv6 default route was already missing BEFORE I ran
+  ipconfig /renew6 (first route check = 0), so that did not cause it.
+  USER DECISION: will not touch the network, I may not touch anything outside
+  the project; expects me to fix it. Honest limit: .env needs IPv6 (direct
+  host is IPv6-only), the only IPv4 path (pooler) is reset by the network at
+  the Postgres handshake; the only project-side workaround left is plaintext
+  Postgres to the pooler, which I refuse (unencrypted data + evading a network
+  filter). Open: local test DB review is available on request.
+  USER ORDER (final, angry): the project MUST run over IPv4; never mention
+  IPv6 again. DOING: (1) switch .env DB settings to the IPv4 Supabase pooler
+  (host aws-0-ap-northeast-1.pooler.supabase.com, port 6543, user
+  postgres.<ref>; same values Vercel uses) - old .env copied to
+  .axet-code/tmp/env.before-pooler (gitignored, delete when done); old values
+  were host db.<ref>.supabase.co, port 5432, user postgres. (2) read-only
+  SELECT 1 over normal TLS, then over direct TLS (Postgres 17 ALPN) if the
+  network still resets it. Only project files; nothing outside the folder.
+  RESULT: .env now uses the IPv4 pooler (host aws-0-ap-northeast-1.pooler.
+  supabase.com, port 6543, user postgres.<ref>); old copy in .axet-code/tmp/
+  env.before-pooler (delete when no longer needed; DATABASE_URL/DIRECT_URL for
+  the Prisma CLI were NOT changed). Read-only probes from this Wi-Fi: normal
+  TLS -> ECONNRESET (~150 ms); direct TLS (ALPN postgresql) -> handshake
+  timeout (pooler/network does not answer it). So no project-side setting
+  gets a Postgres connection through on this network; app login still shows
+  "cannot reach the database" here. Probe scripts deleted. NOT done: nothing
+  was sent unencrypted, no plaintext fallback.
+  USER: "other apps connect to a simple DB, why not this". NEXT (read-only):
+  run the standard client psql.exe (installed with Postgres 17) against the
+  same IPv4 pooler with sslmode=require and SELECT 1. If psql connects, the
+  problem is Node-specific and fixable in the project; if psql is reset too,
+  the network blocks every Postgres client. Password read from .env inside a
+  node script, never printed. Script deleted after.
+  RESULT: psql 17 (a standard non-Node client) fails IDENTICALLY against the
+  IPv4 pooler, sslmode=require and prefer: "server closed the connection
+  unexpectedly" in ~340 ms. So it is not Node, not the project code, not the
+  TLS settings: the network cuts Postgres connections to Supabase for every
+  client on this PC. .env stays on the IPv4 pooler (what Vercel uses).
+  HTTPS to supabase hosts still works, but this app needs real Postgres (raw
+  SQL on per-project schemas, Prisma, NextAuth adapter) so an HTTPS-API
+  rewrite is not a quick or safe change.
+  USER (angry): all options rejected; the project MUST run on IPv4 and they
+  accept restarting from zero / changing the core. DECISION: make the DB
+  transport work over port 443 (WebSocket), which this network allows. Plan:
+  (1) feasibility: confirm a WebSocket upgrade passes on 443 and that Prisma
+  7 has a matching serverless adapter (@prisma/adapter-neon +
+  @neondatabase/serverless + ws). (2) add a DB_DRIVER=neon switch in
+  src/lib/prisma.ts (default stays pg; local test DB stays pg) + a unit test
+  for the selection. (3) offline migration SQL (prisma migrate diff, no DB
+  needed) to paste into the new DB's browser SQL editor, since prisma migrate
+  over TCP is also blocked. (4) .env.example + README note. NEEDS from user:
+  a free Neon project (can't create accounts) and its connection string.
+  Only project files change; tsc only, no full test run.
+- **Status**: feasibility DONE. ROOT CAUSE: the network runs Zscaler (cert issuer
+  "Zscaler Inc." on supabase/npm/github 443): it re-signs HTTPS and drops raw
+  Postgres (SSLRequest) for every client. A WebSocket upgrade on 443 PASSES
+  (server answered HTTP 401). Node rejects the Zscaler cert (UNABLE_TO_GET_
+  ISSUER_CERT_LOCALLY) unless it trusts the Windows store: Node 26 has
+  tls.setDefaultCACertificates + tls.getCACertificates('system'). Adapter
+  @prisma/adapter-neon 7.10.1 exists (matches Prisma 7.10.1). NOW: npm install
+  @prisma/adapter-neon @neondatabase/serverless ws (+@types/ws), then code.
+  DONE (uncommitted): deps installed (@prisma/adapter-neon 7.10.1,
+  @neondatabase/serverless ^1.2, ws ^8, @types/ws). VERIFIED: with Node told to
+  trust the Windows cert store (155 certs), a wss:// connection through
+  Zscaler reaches the server (HTTP 401); without it UNABLE_TO_GET_ISSUER_
+  CERT_LOCALLY. Code: src/lib/dbDriver.ts (+test, 5 pass) = resolveDbDriver +
+  trustSystemCertificates (verification stays ON); src/lib/prisma.ts uses
+  PrismaNeon when DB_DRIVER=neon (needs NEON_DATABASE_URL), default pg
+  unchanged; next.config.ts serverExternalPackages [ws, neon]; .env.example;
+  README section; prisma/fresh-database.sql (generated offline, 8 tables +
+  GlobalRole enum); scripts/make-admin-sql.mjs (offline bcrypt INSERT for the
+  first SUPER_ADMIN, input-validated, bad input rejected). tsc + eslint clean.
+  NOT verified: any real query through the Neon adapter (no Neon DB yet),
+  dev-server start with the new config, npm run build, integration tests on
+  Neon (run with RUN_DB_INTEGRATION=1 DB_DRIVER=neon NEON_DATABASE_URL=...
+  once available). Vercel/production unaffected by design (DB_DRIVER unset =
+  pg) but the build was not run. .env is on the Supabase IPv4 pooler
+  (unchanged by this step). NEEDS FROM USER: a Neon project + connection
+  string; restart npm run dev. Earlier uncommitted work still in the tree:
+  login useLayoutEffect fix (+ deleted FreshOnReturn files).
+- **Status**: code ready, waiting for the user's Neon connection string.
+- **Plan (user feedback #1, useLayoutEffect)**: User chose the Next.js-docs way:
+  clear the login form in a useLayoutEffect CLEANUP (runs when the page is
+  hidden, so no stale flash on return) instead of a useEffect. One small edit
+  in login/page.tsx. NO tests while the user reviews.
+- **Status**: done, UNTESTED, not committed. login/page.tsx: useLayoutEffect
+  cleanup resets username/password and clears the error. Known: the
+  show-password toggle (inside PasswordInput) is not reset by this.
+
+- **Plan (user feedback #1, redo)**: User did NOT want the FreshOnReturn wrapper
+  or tests. Replace it with a plain useEffect(...,[]) in the login form that
+  clears the fields (keeps the ?message= text). Delete fresh-on-return.tsx and
+  scripts/login-persist-check.mjs. NO test runs while the user is reviewing.
+- **Status**: done (NOT tested, per user; NOT committed). login/page.tsx now
+  clears the form and error in a useEffect (reset + setFormError(message));
+  fresh-on-return.tsx and the Chrome check script deleted. The earlier commit
+  de5ae59 still contains the old wrapper until the next commit removes it.
+  LESSON (user, twice): while the user is reviewing, make the smallest
+  possible fix, do not run tests/lint/build, do not add components.
+
 - **Plan (user feedback #1)**: Login page keeps what the user typed after
   leaving to another page and coming back (browser back / bfcache / form
   restore). The form must be empty whenever the user returns. Find why the

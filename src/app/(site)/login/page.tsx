@@ -1,31 +1,32 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useAppRouter } from "@/lib/useAppRouter";
 import { signIn } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Suspense, useState } from "react";
+import { Suspense, useLayoutEffect, useState } from "react";
 
 import { loginSchema, type LoginInput } from "@/lib/validation/auth";
 import { PasswordInput } from "@/components/password-input";
-import { FreshOnReturn } from "@/components/fresh-on-return";
+import { ActionButton } from "@/components/action-button";
 
 export default function LoginPage() {
   return (
     <Suspense fallback={null}>
-      <FreshOnReturn>
-        <LoginForm />
-      </FreshOnReturn>
+      <LoginForm />
     </Suspense>
   );
 }
 
 function LoginForm() {
-  const router = useRouter();
+  const router = useAppRouter();
   const searchParams = useSearchParams();
   const [formError, setFormError] = useState<string | null>(
     searchParams.get("message")
   );
+
+  const [redirecting, setRedirecting] = useState(false);
 
   const rawCallbackUrl = searchParams.get("callbackUrl");
   // Only allow same-origin relative paths (e.g. "/projecta/board") — never
@@ -39,10 +40,22 @@ function LoginForm() {
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
+    defaultValues: { username: "", password: "" },
   });
+
+  // Next.js hides this page instead of unmounting it, so clear the form as it
+  // is hidden; the cleanup runs before it is shown again, with no stale flash.
+  useLayoutEffect(() => {
+    return () => {
+      reset({ username: "", password: "" });
+      setFormError(null);
+      setRedirecting(false);
+    };
+  }, [reset]);
 
   async function onSubmit(data: LoginInput) {
     setFormError(null);
@@ -73,12 +86,20 @@ function LoginForm() {
       return;
     }
 
+    // Stay in the "logging in" state until the page actually changes, and fade
+    // out first so the dashboard does not pop in.
+    setRedirecting(true);
+    await new Promise((resolve) => setTimeout(resolve, 220));
     router.push(callbackUrl);
     router.refresh();
   }
 
   return (
-    <div className="relative flex flex-1 items-center justify-center overflow-hidden px-4 py-12">
+    <div
+      className={`relative flex flex-1 items-center justify-center overflow-hidden px-4 py-12 transition-opacity duration-200 ${
+        redirecting ? "opacity-0" : "opacity-100"
+      }`}
+    >
       <div
         aria-hidden="true"
         className="animate-float pointer-events-none absolute -left-20 top-0 h-72 w-72 rounded-full bg-yellow-300/25 blur-3xl"
@@ -142,13 +163,14 @@ function LoginForm() {
             </p>
           )}
 
-          <button
+          <ActionButton
             type="submit"
-            disabled={isSubmitting}
-            className="rounded bg-foreground px-4 py-2 text-background disabled:opacity-50"
+            pending={isSubmitting || redirecting}
+            pendingLabel="Logging in..."
+            className="rounded bg-foreground px-4 py-2 text-background"
           >
-            {isSubmitting ? "Logging in..." : "Log in"}
-          </button>
+            Log in
+          </ActionButton>
         </form>
       </div>
     </div>

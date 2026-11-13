@@ -8,6 +8,7 @@ import { createProjectSchema } from "@/lib/validation/project";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { canCreateProject } from "@/lib/permissions";
 import { withApiErrorHandling } from "@/lib/apiError";
+import { actor, recordAudit } from "@/lib/audit";
 
 const CREATE_PROJECT_LIMIT = 100;
 const CREATE_PROJECT_WINDOW_MS = 60 * 1000;
@@ -87,6 +88,15 @@ async function handlePOST(request: Request) {
         ],
       },
     },
+  });
+
+  await recordAudit({
+    ...actor(session.user),
+    level: "INFO",
+    category: "project",
+    action: "project.created",
+    message: `Created project "${project.name}" with ${extraMemberIds.length + 1} member(s)`,
+    target: `project:${project.slug}`,
   });
 
   return NextResponse.json(

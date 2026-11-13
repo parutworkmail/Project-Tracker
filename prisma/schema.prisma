@@ -126,3 +126,23 @@ model RateLimitEntry {
   count   Int      @default(1)
   resetAt DateTime
 }
+
+// Who did what, and what went wrong. Written by src/lib/audit.ts (never throws), read
+// by the super-admin Audit log page. actorName is a copy of the username so rows stay
+// readable after the account is deleted.
+model AuditLog {
+  id        String   @id @default(cuid())
+  level     String
+  category  String
+  action    String
+  message   String
+  actorId   String?
+  actorName String?
+  target    String?
+  ip        String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([level, createdAt])
+}

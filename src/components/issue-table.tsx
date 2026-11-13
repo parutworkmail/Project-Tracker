@@ -2,10 +2,11 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/lib/useAppRouter";
 
 import { PriorityBadge } from "@/components/issue-badges";
 import { LabelChip } from "@/components/label-chip";
+import { useConfirm } from "@/components/confirm-provider";
 import { useToday } from "@/lib/useToday";
 import {
   ISSUE_STATUSES,
@@ -41,7 +42,7 @@ export function IssueTable({
   canManage: boolean;
   filtered: boolean;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const today = useToday();
   const [, startTransition] = useTransition();
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
@@ -49,6 +50,7 @@ export function IssueTable({
     Record<string, { from: IssueStatus; to: IssueStatus }>
   >({});
   const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   function setPending(issueId: string, pending: boolean) {
     setPendingIds((prev) => {
@@ -109,12 +111,22 @@ export function IssueTable({
     }
   }
 
-  function handleDelete(issueId: string, title: string) {
-    if (!window.confirm(`Delete task "${title}"? This cannot be undone.`)) {
-      return;
-    }
+  async function handleDelete(issueId: string, title: string) {
+    const ok = await confirm({
+      title: "Delete task?",
+      message: (
+        <>
+          Delete <strong>{title}</strong>? Its comments and history are removed
+          too. This cannot be undone.
+        </>
+      ),
+      confirmLabel: "Delete task",
+      tone: "danger",
+    });
 
-    return request(issueId, { method: "DELETE" });
+    if (!ok) return;
+
+    await request(issueId, { method: "DELETE" });
   }
 
   if (issues.length === 0) {

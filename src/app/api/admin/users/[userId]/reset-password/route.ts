@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { isSuperAdmin } from "@/lib/permissions";
 import { resetPasswordSchema } from "@/lib/validation/admin";
 import { withApiErrorHandling } from "@/lib/apiError";
+import { actor, recordAudit } from "@/lib/audit";
 import { enforceRateLimit, HOUR } from "@/lib/enforceRateLimit";
 
 async function handlePOST(
@@ -75,6 +76,15 @@ async function handlePOST(
       failedLoginAttempts: 0,
       lockedUntil: null,
     },
+  });
+
+  await recordAudit({
+    ...actor(session.user),
+    level: "WARN",
+    category: "user",
+    action: "user.password_reset",
+    message: `Reset the password of user "${existing.username}"`,
+    target: `user:${existing.username}`,
   });
 
   return NextResponse.json({ ok: true });

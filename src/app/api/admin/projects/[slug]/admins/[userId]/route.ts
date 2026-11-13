@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { isSuperAdmin } from "@/lib/permissions";
 import { withApiErrorHandling } from "@/lib/apiError";
+import { actor, recordAudit } from "@/lib/audit";
 
 async function handleDELETE(
   _request: Request,
@@ -29,6 +30,16 @@ async function handleDELETE(
 
   await prisma.projectAdmin.deleteMany({
     where: { projectId: project.id, userId },
+  });
+
+  await recordAudit({
+    ...actor(session.user),
+    level: "INFO",
+    category: "project",
+    action: "project.admin_removed",
+    message: `Removed an admin from "${project.name}"`,
+    target: `project:${project.slug}`,
+    meta: { removedUserId: userId },
   });
 
   return NextResponse.json({ ok: true });

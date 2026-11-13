@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/lib/useAppRouter";
 
 import { LocalTime } from "@/components/local-time";
+import { useConfirm } from "@/components/confirm-provider";
 
 interface CommentView {
   id: string;
@@ -26,11 +27,12 @@ export function IssueComments({
   currentUserId: string;
   canManage: boolean;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   const base = `/api/projects/${slug}/issues/${issueId}/comments`;
 
@@ -72,7 +74,14 @@ export function IssueComments({
   }
 
   async function handleDelete(commentId: string) {
-    if (!window.confirm("Delete this comment?")) return;
+    const ok = await confirm({
+      title: "Delete comment?",
+      message: "This comment will be removed for everyone. This cannot be undone.",
+      confirmLabel: "Delete comment",
+      tone: "danger",
+    });
+
+    if (!ok) return;
 
     setDeletingId(commentId);
     setError(null);

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/lib/useAppRouter";
+import { useConfirm } from "@/components/confirm-provider";
 
 interface Member {
   id: string;
@@ -19,11 +20,12 @@ export function ProjectMemberManager({
   members: Member[];
   currentUserId: string;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const [username, setUsername] = useState("");
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   function setPending(userId: string, pending: boolean) {
     setPendingIds((prev) => {
@@ -71,11 +73,21 @@ export function ProjectMemberManager({
     const isSelf = member.id === currentUserId;
     const label = member.name || member.username;
 
-    const message = isSelf
-      ? "Remove yourself from this project? Your tasks will become unassigned."
-      : `Remove ${label} from this project? Their tasks will become unassigned.`;
+    const ok = await confirm({
+      title: isSelf ? "Remove yourself?" : "Remove member?",
+      message: isSelf ? (
+        "Remove yourself from this project? Your tasks will become unassigned."
+      ) : (
+        <>
+          Remove <strong>{label}</strong> from this project? Their tasks will
+          become unassigned.
+        </>
+      ),
+      confirmLabel: isSelf ? "Remove me" : "Remove member",
+      tone: "danger",
+    });
 
-    if (!window.confirm(message)) return;
+    if (!ok) return;
 
     setPending(member.id, true);
     setError(null);

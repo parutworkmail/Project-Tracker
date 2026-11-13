@@ -1,6 +1,28 @@
 import type { NextConfig } from "next";
 
+import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+
 const isDev = process.env.NODE_ENV === "development";
+
+// The footer shows which build is running: package.json version + short commit.
+const appVersion: string = JSON.parse(readFileSync("./package.json", "utf8")).version;
+
+function shortCommit(): string {
+  if (process.env.VERCEL_GIT_COMMIT_SHA) {
+    return process.env.VERCEL_GIT_COMMIT_SHA.slice(0, 7);
+  }
+
+  try {
+    return execSync("git rev-parse --short HEAD", {
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim();
+  } catch {
+    return "";
+  }
+}
 
 // Nonce-based CSP needs fully dynamic rendering, which would defeat the
 // prerendered/PPR pages here, so inline scripts/styles stay allowed and the
@@ -42,6 +64,10 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,
+  env: {
+    NEXT_PUBLIC_APP_VERSION: appVersion,
+    NEXT_PUBLIC_APP_COMMIT: shortCommit(),
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

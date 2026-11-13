@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { changePasswordSchema } from "@/lib/validation/auth";
 import { withApiErrorHandling } from "@/lib/apiError";
+import { actor, recordAudit } from "@/lib/audit";
 import { enforceRateLimit, MINUTE } from "@/lib/enforceRateLimit";
 
 async function handlePATCH(request: Request) {
@@ -58,6 +59,14 @@ async function handlePATCH(request: Request) {
       password: hashedPassword,
       mustChangePassword: false,
     },
+  });
+
+  await recordAudit({
+    ...actor(session.user),
+    level: "INFO",
+    category: "auth",
+    action: "password.changed",
+    message: "Changed their own password",
   });
 
   return NextResponse.json({ ok: true });

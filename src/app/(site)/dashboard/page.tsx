@@ -8,6 +8,10 @@ import { CreateProjectDialog } from "@/components/create-project-dialog";
 import { ProjectListSection } from "@/components/project-list-section";
 import { ProjectSearchInput } from "@/components/project-search-input";
 import { ProjectListSkeleton } from "@/components/project-list-skeleton";
+import {
+  DashboardSummarySection,
+  DashboardSummarySkeleton,
+} from "@/components/dashboard-summary";
 
 export const instant = false;
 
@@ -92,6 +96,14 @@ export default async function DashboardPage({
             </div>
           </div>
         </section>
+
+        <Suspense fallback={<DashboardSummarySkeleton />}>
+          <DashboardSummarySection
+            userId={session.user.id}
+            role={session.user.role}
+            isSuperAdmin={isSuperAdmin}
+          />
+        </Suspense>
 
         <ProjectSearchInput initialQuery={query} />
 

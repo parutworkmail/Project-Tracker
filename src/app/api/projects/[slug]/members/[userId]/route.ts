@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { unassignUserIssues } from "@/lib/projectSchema";
 import { canManageProject } from "@/lib/permissions";
 import { withApiErrorHandling } from "@/lib/apiError";
+import { actor, recordAudit } from "@/lib/audit";
 
 async function handleDELETE(
   _request: Request,
@@ -57,6 +58,18 @@ async function handleDELETE(
 
   await prisma.projectMember.delete({
     where: { projectId_userId: { projectId: project.id, userId } },
+  });
+
+  await recordAudit({
+    ...actor(session.user),
+    level: "INFO",
+    category: "project",
+    action: isSelf ? "project.member_left" : "project.member_removed",
+    message: isSelf
+      ? `Left project "${project.name}"`
+      : `Removed a member from "${project.name}"`,
+    target: `project:${project.slug}`,
+    meta: isSelf ? null : { removedUserId: userId },
   });
 
   return NextResponse.json({ ok: true });

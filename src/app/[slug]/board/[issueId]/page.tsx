@@ -10,7 +10,6 @@ import { IssueDetailForm } from "@/components/issue-detail-form";
 import { IssueComments } from "@/components/issue-comments";
 import { IssueActivity } from "@/components/issue-activity";
 import { LocalTime } from "@/components/local-time";
-import { ProjectNav } from "@/components/project-nav";
 
 export const instant = false;
 
@@ -87,13 +86,6 @@ export default async function IssueDetailPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <ProjectNav
-        slug={project.slug}
-        name={project.name}
-        active="board"
-        canManage={canManage}
-      />
-
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8">
         <Link
           href={`/${project.slug}/board`}

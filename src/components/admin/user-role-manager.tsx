@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/lib/useAppRouter";
 
 import {
   EditUserDialog,
   ResetPasswordDialog,
 } from "@/components/admin/user-edit-dialogs";
+import { DeleteUserDialog } from "@/components/admin/delete-user-dialog";
 
 type Role = "SUPER_ADMIN" | "ADMIN" | "USER";
 
@@ -27,11 +28,32 @@ export function UserRoleManager({
   users: UserRow[];
   currentUserId: string;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  // The dialogs stay mounted while they fade out, so the user is kept apart from
+  // the open flag; the sequence number gives every opening a fresh form.
   const [editing, setEditing] = useState<UserRow | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSeq, setEditSeq] = useState(0);
   const [resetting, setResetting] = useState<UserRow | null>(null);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetSeq, setResetSeq] = useState(0);
+  const [deleting, setDeleting] = useState<UserRow | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteSeq, setDeleteSeq] = useState(0);
+
+  function openEditor(user: UserRow) {
+    setEditing(user);
+    setEditSeq((n) => n + 1);
+    setEditOpen(true);
+  }
+
+  function openReset(user: UserRow) {
+    setResetting(user);
+    setResetSeq((n) => n + 1);
+    setResetOpen(true);
+  }
 
   function setPending(userId: string, pending: boolean) {
     setPendingIds((prev) => {
@@ -68,33 +90,10 @@ export function UserRoleManager({
     router.refresh();
   }
 
-  async function deleteUser(userId: string, username: string) {
-    if (
-      !window.confirm(
-        `Delete user "${username}"? This cannot be undone.`
-      )
-    ) {
-      return;
-    }
-
-    setPending(userId, true);
-    setError(null);
-
-    const res = await fetch(`/api/admin/users/${userId}`, {
-      method: "DELETE",
-    });
-
-    if (!res.ok) {
-      const body = await res.json().catch(() => null);
-      setError(
-        typeof body?.error === "string" ? body.error : "Delete failed."
-      );
-      setPending(userId, false);
-      return;
-    }
-
-    setPending(userId, false);
-    router.refresh();
+  function openDelete(user: UserRow) {
+    setDeleting(user);
+    setDeleteSeq((n) => n + 1);
+    setDeleteOpen(true);
   }
 
   return (
@@ -150,7 +149,7 @@ export function UserRoleManager({
                   <button
                     type="button"
                     aria-label={`Edit ${user.username}`}
-                    onClick={() => setEditing(user)}
+                    onClick={() => openEditor(user)}
                     className="rounded border border-black/[.08] px-2 py-1 text-xs dark:border-white/[.145]"
                   >
                     Edit
@@ -160,7 +159,7 @@ export function UserRoleManager({
                       <button
                         type="button"
                         aria-label={`Reset password for ${user.username}`}
-                        onClick={() => setResetting(user)}
+                        onClick={() => openReset(user)}
                         className="rounded border border-black/[.08] px-2 py-1 text-xs dark:border-white/[.145]"
                       >
                         Reset password
@@ -169,7 +168,7 @@ export function UserRoleManager({
                         type="button"
                         disabled={pendingIds.has(user.id)}
                         aria-label={`Delete ${user.username}`}
-                        onClick={() => deleteUser(user.id, user.username)}
+                        onClick={() => openDelete(user)}
                         className="rounded border border-red-600 px-2 py-1 text-xs text-red-600 disabled:opacity-50"
                       >
                         Delete
@@ -185,12 +184,28 @@ export function UserRoleManager({
       </div>
 
       {editing && (
-        <EditUserDialog user={editing} onClose={() => setEditing(null)} />
+        <EditUserDialog
+          key={editSeq}
+          open={editOpen}
+          user={editing}
+          onClose={() => setEditOpen(false)}
+        />
       )}
       {resetting && (
         <ResetPasswordDialog
+          key={resetSeq}
+          open={resetOpen}
           user={resetting}
-          onClose={() => setResetting(null)}
+          onClose={() => setResetOpen(false)}
+        />
+      )}
+      {deleting && (
+        <DeleteUserDialog
+          key={deleteSeq}
+          open={deleteOpen}
+          user={deleting}
+          onClose={() => setDeleteOpen(false)}
+          onExited={() => setDeleting(null)}
         />
       )}
     </div>

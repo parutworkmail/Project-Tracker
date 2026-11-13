@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useAppRouter, useNavigationBusy } from "@/lib/useAppRouter";
+import { ActionButton } from "@/components/action-button";
+import { useConfirm } from "@/components/confirm-provider";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -17,7 +19,9 @@ export function ProjectManageControls({
   slug: string;
   name: string;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
+  const navigating = useNavigationBusy();
+  const confirm = useConfirm();
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,13 +62,19 @@ export function ProjectManageControls({
   }
 
   async function onDelete() {
-    if (
-      !window.confirm(
-        `Delete "${name}"? This permanently removes the project and all its issues.`
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      title: "Delete project?",
+      message: (
+        <>
+          Delete <strong>{name}</strong>? This permanently removes the project
+          and all its tasks, comments and labels. This cannot be undone.
+        </>
+      ),
+      confirmLabel: "Delete project",
+      tone: "danger",
+    });
+
+    if (!ok) return;
 
     setIsDeleting(true);
     setError(null);
@@ -125,21 +135,24 @@ export function ProjectManageControls({
         </div>
 
         <div className="flex items-center gap-2">
-          <button
+          <ActionButton
             type="submit"
-            disabled={isSubmitting}
-            className="rounded bg-foreground px-2 py-1 text-xs text-background disabled:opacity-50"
+            pending={isSubmitting || navigating}
+            pendingLabel="Saving..."
+            disabled={isDeleting}
+            className="rounded bg-foreground px-2 py-1 text-xs text-background"
           >
             Save
-          </button>
-          <button
-            type="button"
+          </ActionButton>
+          <ActionButton
             onClick={onDelete}
-            disabled={isDeleting}
-            className="rounded border border-red-600 px-2 py-1 text-xs text-red-600 disabled:opacity-50"
+            pending={isDeleting || navigating}
+            pendingLabel="Deleting..."
+            disabled={isSubmitting}
+            className="rounded border border-red-600 px-2 py-1 text-xs text-red-600"
           >
-            {isDeleting ? "Deleting..." : "Delete"}
-          </button>
+            Delete
+          </ActionButton>
         </div>
         {error && <span className="text-xs text-red-600">{error}</span>}
       </form>

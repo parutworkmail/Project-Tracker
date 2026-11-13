@@ -7,6 +7,7 @@ import { dropProjectSchema } from "@/lib/projectSchema";
 import { updateProjectSchema } from "@/lib/validation/project";
 import { canManageProject } from "@/lib/permissions";
 import { withApiErrorHandling } from "@/lib/apiError";
+import { actor, recordAudit } from "@/lib/audit";
 
 async function handleGET(
   _request: Request,
@@ -97,6 +98,17 @@ async function handlePATCH(
       data,
     });
 
+    await recordAudit({
+      ...actor(session.user),
+      level: "INFO",
+      category: "project",
+      action: "project.updated",
+      message: `Updated project "${project.name}"${
+        updated.name !== project.name ? ` (renamed to "${updated.name}")` : ""
+      }${updated.slug !== project.slug ? ` (link changed to /${updated.slug})` : ""}`,
+      target: `project:${updated.slug}`,
+    });
+
     return NextResponse.json({
       id: updated.id,
       name: updated.name,
@@ -147,6 +159,15 @@ async function handleDELETE(
 
   await dropProjectSchema(project.schemaName);
   await prisma.project.delete({ where: { id: project.id } });
+
+  await recordAudit({
+    ...actor(session.user),
+    level: "WARN",
+    category: "project",
+    action: "project.deleted",
+    message: `Deleted project "${project.name}"`,
+    target: `project:${project.slug}`,
+  });
 
   return NextResponse.json({ ok: true });
 }

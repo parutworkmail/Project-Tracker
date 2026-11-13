@@ -9,13 +9,13 @@ import { IssueFilters } from "@/components/issue-filters";
 import { LeaveProjectButton } from "@/components/leave-project-button";
 import { JoinProjectButton } from "@/components/join-project-button";
 import { CreateIssueButton } from "@/components/create-issue-button";
+import { ExportCsvButton } from "@/components/export-csv-button";
 import { IssueBoardSection } from "@/components/issue-board-section";
 import {
   ProjectStatsSection,
   ProjectStatsSkeleton,
 } from "@/components/project-stats-section";
 import { listLabels } from "@/lib/projectSchema";
-import { ProjectNav } from "@/components/project-nav";
 import { BackLink } from "@/components/back-link";
 
 export const instant = false;
@@ -75,13 +75,6 @@ export default async function ProjectBoardPage({
 
   return (
     <div className="flex flex-1 flex-col">
-      <ProjectNav
-        slug={project.slug}
-        name={project.name}
-        active="board"
-        canManage={canManage}
-      />
-
       <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-8">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
           <h1 className="text-xl font-semibold">Tasks</h1>
@@ -93,13 +86,9 @@ export default async function ProjectBoardPage({
                 userId={session.user.id}
               />
             )}
-            <a
+            <ExportCsvButton
               href={`/api/projects/${project.slug}/issues/export${buildBoardQuery(filters, { page: 1, view: "list" })}`}
-              download
-              className="btn-secondary rounded-xl px-3 py-1.5 text-sm"
-            >
-              Export CSV
-            </a>
+            />
             <CreateIssueButton slug={project.slug} assignees={assignees} />
           </div>
         </div>

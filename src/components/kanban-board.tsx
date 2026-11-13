@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useAppRouter } from "@/lib/useAppRouter";
 
 import { PriorityBadge } from "@/components/issue-badges";
 import { LabelChip } from "@/components/label-chip";
@@ -45,7 +45,7 @@ export function KanbanBoard({
   assigneeNames: Record<string, string>;
   total: number;
 }) {
-  const router = useRouter();
+  const router = useAppRouter();
   const today = useToday();
   const [, startTransition] = useTransition();
   const [optimistic, setOptimistic] = useState<
