@@ -6,6 +6,93 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
+- **MONDAY DONE (end-to-end loop + browser check)**: scripts/e2e-loop.mjs (161 checks, ALL PASS on
+  the local test DB: 3 roles + extra user, forced password change, projects, member/admin
+  assignment, labels, tasks, comments, filters, kanban, CSV incl. formula-injection, my-tasks,
+  leave/remove, user edit/role/reset/lockout, per-IP login rate limit, typed-name project delete,
+  /admin/logs access, audit rows, no passwords in audit rows). It writes docs/test-data/manifest.json
+  (every user + project it made, with their passwords; git-ignored) and
+  scripts/test-data-cleanup.mjs removes exactly those (dry run by default, --yes to delete;
+  refuses if the manifest DB differs from the connected DB). Run:
+  `node scripts/with-local-db.mjs node scripts/e2e-loop.mjs http://localhost:3100` (needs
+  `node scripts/with-local-db.mjs npx next start -p 3100` running after a build) and
+  `node scripts/with-local-db.mjs node scripts/test-data-cleanup.mjs [--yes]`.
+  scripts/browser-check.mjs (puppeteer-core + Chrome headless) logs in for real and screenshots 12
+  pages in light+dark into tmp-shots/ (git-ignored): 0 console errors, 0 HTTP 5xx; footer, /admin/logs
+  (filters, paging, empty + far-page states) and the confirm dialogs look right in both themes;
+  dialog is aria-modal + labelled, focus lands inside, Escape closes. Confirmed still-open finding
+  for Tuesday: page scroll is NOT locked while a dialog is open (body overflow stays visible).
+  Test-script lessons: all loop traffic is one IP so the login limit (10/15 min, every attempt
+  counts) must be cleared between logins; DELETE of a missing task returns 200 (idempotent, left as
+  is); project DELETE needs {confirmName}. Test data from the run is KEPT in the local DB
+  (5 users, 1 project) so it can be browsed; the local DB lives in %TEMP%/tracker-local-pg.
+  Environment notes: this PC could not reach Supabase (db host resolves to IPv6 only; the pooler
+  hosts accept TCP but reset the connection - likely a network filter; ask the user to try another
+  network); local-db.mjs `start` can hang the shell while the server is in fact up - check port
+  5544 instead of waiting. Chrome/Edge GUI opens blank pages on this PC (files and localhost), so
+  reports are .docx.
+- **Status**: Monday finished; next is Tuesday (review findings + typed-name delete in Settings).
+
+- **WEEK PLAN (new week; user asked for the plan, nothing started yet)**: Facts checked: main ==
+  origin/main at ca8184d; tag v0.0.1 -> 81425b9 (ca8184d is the USER's own footer-name commit,
+  "Developed by Parut Na", so the live footer reads v0.0.1 + commit ca8184d); only uncommitted
+  file is this log; dev server + test DB are off; this PC cannot resolve the Supabase host
+  right now (DNS ENOTFOUND) so all my testing is on the LOCAL test DB.
+  SCHEDULE: Mon = end-to-end loop (3 roles, projects, tasks) writing docs/test-data manifest +
+  cleanup script, then browser check of confirm dialogs / /admin/logs / footer in light+dark and
+  fix findings. Tue = review findings (dialog focus trap + scroll lock, live-region announcements,
+  unsaved-changes warning, GET /issues search params) + typed-name delete in Project Settings.
+  Wed = small leftovers (label picker in Create task, CSV 5000-row notice, overdue date
+  consistency, forms keeping typed text) + CHANGELOG. Thu = SUBTASKS (user chose it: per-project
+  lazy schema upgrade, no manual Supabase migration). Fri = full validation (tsc, eslint, full
+  vitest, build, e2e), version 0.0.2 (alpha), commit + tag, report for the user to verify.
+  RELEASE RULES: commit locally per item; push ONLY when the user says; never move a pushed
+  tag (0.0.2 fixes the tag/commit mismatch); 0.1.0 (beta) later after real use.
+  USER ACTIONS STILL OPEN: apply migration 20261113000000_add_audit_log to Supabase (can paste
+  the SQL into the Supabase dashboard SQL editor, then run prisma migrate resolve --applied
+  20261113000000_add_audit_log from a network that reaches the DB - this exact route untested);
+  check the live footer; decide on the two old git stashes.
+- **Status**: plan agreed (Thursday feature = subtasks); waiting for the user to say start.
+
+- **STATE AT END OF WEEK (read this first)**: v0.0.1 (alpha) is committed (81425b9), tagged
+  v0.0.1 and PUSHED (the one push the user allowed is used up; push needs a new explicit ask).
+  Todo list cleared. Validated before the commit: tsc clean, eslint 0 errors, 411 unit tests
+  passed / 13 skipped, production build OK on the local-DB env. Nothing in progress. Only
+  uncommitted file: PROGRESS.md (this log).
+
+  **NEXT TODO - release 0.0.1 items that were NOT finished**
+  1. USER ACTION: apply the new migration to Supabase (npx prisma migrate deploy; creates the
+     AuditLog table). Until then /admin/logs shows a "table does not exist" message and audit
+     writes fail quietly; the rest of the site works.
+  2. USER ACTION: after the deploy, check the footer reads "v0.0.1 alpha" with the commit id.
+  3. END-TO-END LOOP (requested, NOT done): script that creates temp users for all 3 roles
+     (SUPER_ADMIN, ADMIN, USER) with temp passwords + forced password change, projects, member +
+     admin assignment, tasks, comments, labels, filters/kanban/CSV/stats/my-tasks, leave/remove,
+     deletes, audit rows; MUST write a manifest of every user/project it creates (e.g. docs/
+     test-data/manifest.json) plus a cleanup script that deletes exactly those, so the user can
+     remove them one day. Run on the LOCAL test DB only (node scripts/local-db.mjs start +
+     scripts/with-local-db.mjs). scripts/e2e-issues.mjs + scripts/e2e-cleanup.mjs already cover
+     issues/comments/members/admin edit/lockout (old, not re-run on 0.0.1) - extend them.
+  4. BROWSER CHECK (not done): the shared ConfirmProvider dialogs (delete task / comment / label /
+     leave project / remove member / Project Settings delete / remove project admin), /admin/logs
+     (filters, paging, empty and failure states), footer, in light AND dark mode.
+  5. CHANGELOG file (requested, not written). The tag is v0.0.1 (package.json 0.0.1); the page
+     label says "alpha".
+  6. Small leftovers from this week: Project Settings delete still uses a plain confirm (no typed
+     name); label picker missing in the Create task dialog; CSV export has no on-screen warning
+     when cut at 5000 rows; stats/My tasks use the server date for overdue (list uses browser
+     date); other forms (change-password, filters, comments) still keep typed text on return.
+  7. Still open from earlier reviews: dialog focus trap + scroll lock, live-region announcements,
+     unsaved-changes warning on the task page, GET /issues ignoring search params; features not
+     started: notifications, subtasks.
+  8. Housekeeping: git stash@{0} (supabase-https adapter) and stash@{1} (neon workaround) hold
+     rejected experiments - drop when sure (git stash drop). Possible leftover e2e_* rows in
+     Supabase (node --env-file=.env scripts/e2e-cleanup.mjs when it is reachable).
+  9. KNOWN ENVIRONMENT PROBLEM: from the user's office network (Zscaler) raw Postgres to Supabase
+     was blocked on some days; it worked again on another network. The user's :3000 dev server
+     is STOPPED - start it with npm run dev. My local test DB is stopped too.
+
+
 - **Plan (user: "commit everything and push just this time, end of week")**: user explicitly
   allows ONE push now. Order: (1) full validation on the current tree (tsc, eslint, full
   vitest, production build against the LOCAL db env) and fix anything that fails FIRST,
@@ -13,7 +100,9 @@ Logging". Shows exactly what was happening if the last session crashed.)
   (5) ONE push of main with the tag, (6) restart the user's :3000 dev server, stop my test
   DB. The end-to-end loop script is NOT done and will be reported as such. Supabase DB is
   not touched; the AuditLog migration must be applied there by the user.
-- **Status**: validation done, committing + tagging v0.0.1 + ONE push now (user left, said no
+- **Status**: DONE. Committed 81425b9 (all 84 paths), annotated tag v0.0.1, and PUSHED once to
+  origin/main (6a9e432..81425b9) plus the tag, as the user allowed. The push permission is now
+  used up. Earlier note: validation done, committing + tagging v0.0.1 + ONE push now (user left, said no
   more tests). Results just before: tsc clean, eslint 0 errors (3 old warnings), 411 tests
   passed / 13 skipped, production build OK on the local-DB env. NOT done and NOT claimed:
   the end-to-end loop script + test-data manifest/cleanup script, browser checks of the new

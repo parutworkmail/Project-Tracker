@@ -47,3 +47,7 @@ dist/
 
 # axet-code tool artifacts
 .axet-code/
+
+# local test data (holds throwaway logins) and browser-check screenshots
+/docs/test-data/
+/tmp-shots/
