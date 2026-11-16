@@ -1,12 +1,13 @@
 import {
   ISSUE_PRIORITY_LIST,
   ISSUE_STATUSES,
+  SORT_LABELS,
   type IssuePriority,
   type IssueSort,
   type IssueStatus,
 } from "@/lib/issueMeta";
 
-const SORTS: IssueSort[] = ["newest", "oldest", "updated", "priority", "due"];
+const SORTS = Object.keys(SORT_LABELS) as IssueSort[];
 
 export interface IssueFilterState {
   q: string;

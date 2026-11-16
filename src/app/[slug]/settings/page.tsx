@@ -6,6 +6,7 @@ import { canManageProject } from "@/lib/permissions";
 import { ProjectManageControls } from "@/components/project-manage-controls";
 import { ProjectMemberManager } from "@/components/project-member-manager";
 import { ProjectLabelManager } from "@/components/project-label-manager";
+import { LeaveProjectButton } from "@/components/leave-project-button";
 import { listLabels } from "@/lib/projectSchema";
 
 export const instant = false;
@@ -41,46 +42,67 @@ export default async function ProjectSettingsPage({
     notFound();
   }
 
+  const isMember = project.members.some((m) => m.userId === session.user.id);
+
   const canManage = await canManageProject(
     session.user.id,
     session.user.role,
     project.id
   );
 
-  if (!canManage) {
+  if (!canManage && !isMember) {
     redirect(`/${project.slug}/board`);
   }
 
-  const labels = await listLabels(project.schemaName);
+  const labels = canManage ? await listLabels(project.schemaName) : [];
 
   return (
     <div className="flex flex-1 flex-col">
       <main className="mx-auto w-full max-w-2xl flex-1 px-6 py-8">
-        <section className="mb-8">
-          <h2 className="mb-3 text-sm font-medium text-zinc-500">
-            Name &amp; shareable link
-          </h2>
-          <ProjectManageControls slug={project.slug} name={project.name} />
-        </section>
+        {canManage && (
+          <>
+            <section className="mb-8">
+              <h2 className="mb-3 text-sm font-medium text-zinc-500">
+                Name &amp; shareable link
+              </h2>
+              <ProjectManageControls slug={project.slug} name={project.name} />
+            </section>
 
-        <section className="mb-8">
-          <h2 className="mb-3 text-sm font-medium text-zinc-500">Labels</h2>
-          <ProjectLabelManager slug={project.slug} labels={labels} />
-        </section>
+            <section className="mb-8">
+              <h2 className="mb-3 text-sm font-medium text-zinc-500">Labels</h2>
+              <ProjectLabelManager slug={project.slug} labels={labels} />
+            </section>
 
-        <section>
-          <h2 className="mb-3 text-sm font-medium text-zinc-500">Members</h2>
-          <ProjectMemberManager
-            slug={project.slug}
-            currentUserId={session.user.id}
-            members={project.members.map((m) => ({
-              id: m.user.id,
-              username: m.user.username,
-              name: m.user.name,
-              email: m.user.email,
-            }))}
-          />
-        </section>
+            <section className="mb-8">
+              <h2 className="mb-3 text-sm font-medium text-zinc-500">Members</h2>
+              <ProjectMemberManager
+                slug={project.slug}
+                currentUserId={session.user.id}
+                members={project.members.map((m) => ({
+                  id: m.user.id,
+                  username: m.user.username,
+                  name: m.user.name,
+                  email: m.user.email,
+                }))}
+              />
+            </section>
+          </>
+        )}
+
+        {isMember && (
+          <section>
+            <h2 className="mb-1 text-sm font-medium text-zinc-500">Leave project</h2>
+            <p className="mb-3 text-sm text-zinc-500">
+              You will lose access to this project and your tasks here become
+              unassigned. Someone has to add you back to rejoin.
+            </p>
+            <LeaveProjectButton
+              slug={project.slug}
+              projectName={project.name}
+              userId={session.user.id}
+            />
+          </section>
+        )}
       </main>
     </div>
   );

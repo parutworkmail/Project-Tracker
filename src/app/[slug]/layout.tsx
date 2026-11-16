@@ -34,7 +34,7 @@ async function ProjectNavLoader({ params }: { params: Promise<{ slug: string }> 
     return null;
   }
 
-  return <ProjectNav slug={project.slug} name={project.name} canManage={canManage} />;
+  return <ProjectNav slug={project.slug} name={project.name} />;
 }
 
 function ProjectNavSkeleton() {

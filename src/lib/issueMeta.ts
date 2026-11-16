@@ -1,6 +1,19 @@
 export type IssueStatus = "todo" | "in_progress" | "done";
 export type IssuePriority = "low" | "medium" | "high" | "urgent";
-export type IssueSort = "newest" | "oldest" | "updated" | "priority" | "due";
+export type IssueSort =
+  | "newest"
+  | "oldest"
+  | "updated"
+  | "priority"
+  | "priority_low"
+  | "due"
+  | "due_desc"
+  | "title_asc"
+  | "title_desc"
+  | "status_asc"
+  | "status_desc"
+  | "assignee_asc"
+  | "assignee_desc";
 
 export type LabelColor =
   | "gray"
@@ -72,9 +85,43 @@ export const SORT_LABELS: Record<IssueSort, string> = {
   newest: "Newest first",
   oldest: "Oldest first",
   updated: "Recently updated",
-  priority: "Priority",
-  due: "Due date",
+  priority: "Priority: urgent first",
+  priority_low: "Priority: low first",
+  due: "Due date: soonest first",
+  due_desc: "Due date: latest first",
+  title_asc: "Title: A to Z",
+  title_desc: "Title: Z to A",
+  status_asc: "Status: to do first",
+  status_desc: "Status: done first",
+  assignee_asc: "Assignee: A to Z",
+  assignee_desc: "Assignee: Z to A",
 };
+
+// What the Sort dropdown offers. Column-header sorts (title, status, assignee and
+// the reversed ones) are reachable from the table headers instead.
+export const SORT_MENU: IssueSort[] = ["newest", "oldest", "updated", "priority", "due"];
+
+export type SortColumn = "number" | "title" | "status" | "priority" | "assignee" | "due";
+
+// First click on a header applies `first`, the next click flips to `second`.
+export const SORT_COLUMNS: Record<SortColumn, { first: IssueSort; second: IssueSort }> = {
+  number: { first: "oldest", second: "newest" },
+  title: { first: "title_asc", second: "title_desc" },
+  status: { first: "status_asc", second: "status_desc" },
+  priority: { first: "priority", second: "priority_low" },
+  assignee: { first: "assignee_asc", second: "assignee_desc" },
+  due: { first: "due", second: "due_desc" },
+};
+
+export function sortColumnState(
+  sort: IssueSort,
+  column: SortColumn
+): "first" | "second" | null {
+  const { first, second } = SORT_COLUMNS[column];
+  if (sort === first) return "first";
+  if (sort === second) return "second";
+  return null;
+}
 
 export const STATUS_STYLES: Record<IssueStatus, string> = {
   todo: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",

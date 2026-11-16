@@ -80,6 +80,7 @@ export async function IssueBoardSection({
         assigneeNames={assigneeNames}
         canManage={canManage}
         filtered={hasActiveFilters(filters)}
+        filters={filters}
       />
 
       {total > 0 && (

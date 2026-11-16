@@ -14,7 +14,15 @@ export const ISSUE_SORTS = [
   "oldest",
   "updated",
   "priority",
+  "priority_low",
   "due",
+  "due_desc",
+  "title_asc",
+  "title_desc",
+  "status_asc",
+  "status_desc",
+  "assignee_asc",
+  "assignee_desc",
 ] as const;
 export type IssueSort = (typeof ISSUE_SORTS)[number];
 
@@ -279,12 +287,24 @@ export interface IssueSearchOptions {
   pageSize?: number;
 }
 
+// Assignees live in the shared user table, so sort by the same name people see
+// in the table. A subquery avoids a join, which would make `id`/`status` ambiguous.
+const ASSIGNEE_NAME = `(SELECT lower(COALESCE(NULLIF(u.name, ''), u.username)) FROM "public"."User" u WHERE u.id = issues.assignee_id)`;
+
 const ORDER_BY: Record<IssueSort, string> = {
   newest: "created_at DESC, id ASC",
   oldest: "created_at ASC, id ASC",
   updated: "updated_at DESC, id ASC",
   priority: `CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END ASC, created_at DESC, id ASC`,
+  priority_low: `CASE priority WHEN 'urgent' THEN 3 WHEN 'high' THEN 2 WHEN 'medium' THEN 1 ELSE 0 END ASC, created_at DESC, id ASC`,
   due: "due_date ASC NULLS LAST, created_at DESC, id ASC",
+  due_desc: "due_date DESC NULLS LAST, created_at DESC, id ASC",
+  title_asc: "lower(title) ASC, created_at DESC, id ASC",
+  title_desc: "lower(title) DESC, created_at DESC, id ASC",
+  status_asc: `CASE status WHEN 'todo' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END ASC, created_at DESC, id ASC`,
+  status_desc: `CASE status WHEN 'done' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END ASC, created_at DESC, id ASC`,
+  assignee_asc: `${ASSIGNEE_NAME} ASC NULLS LAST, created_at DESC, id ASC`,
+  assignee_desc: `${ASSIGNEE_NAME} DESC NULLS LAST, created_at DESC, id ASC`,
 };
 
 export async function searchIssues(

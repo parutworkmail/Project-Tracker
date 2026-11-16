@@ -8,6 +8,7 @@ import {
   ISSUE_STATUSES,
   PRIORITY_LABELS,
   SORT_LABELS,
+  SORT_MENU,
   STATUS_LABELS,
   userLabel,
   type IssueLabelView,
@@ -73,37 +74,38 @@ export function IssueFilters({
   }, [search, lastPushed, filters, slug, router]);
 
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-2">
-      <div
-        role="group"
-        aria-label="Task view"
-        className="flex overflow-hidden rounded border border-black/[.08] dark:border-white/[.145]"
-      >
-        {(["list", "board"] as const).map((view) => (
-          <button
-            key={view}
-            type="button"
-            aria-pressed={filters.view === view}
-            onClick={() => navigate({ view })}
-            className={`px-3 py-1.5 text-sm ${
-              filters.view === view
-                ? "bg-accent font-semibold text-on-accent"
-                : "bg-surface text-muted hover:text-foreground"
-            }`}
-          >
-            {view === "list" ? "List" : "Board"}
-          </button>
-        ))}
-      </div>
-
+    <div className="mb-4 flex flex-col gap-2">
       <input
         type="search"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search tasks…"
         aria-label="Search tasks"
-        className={`${CONTROL} min-w-48 flex-1`}
+        className={`${CONTROL} w-full`}
       />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div
+          role="group"
+          aria-label="Task view"
+          className="flex overflow-hidden rounded border border-black/[.08] dark:border-white/[.145]"
+        >
+          {(["list", "board"] as const).map((view) => (
+            <button
+              key={view}
+              type="button"
+              aria-pressed={filters.view === view}
+              onClick={() => navigate({ view })}
+              className={`px-3 py-1.5 text-sm ${
+                filters.view === view
+                  ? "bg-accent font-semibold text-on-accent"
+                  : "bg-surface text-muted hover:text-foreground"
+              }`}
+            >
+              {view === "list" ? "List" : "Board"}
+            </button>
+          ))}
+        </div>
 
       {filters.view === "list" && (
         <select
@@ -184,7 +186,10 @@ export function IssueFilters({
         onChange={(e) => navigate({ sort: e.target.value as IssueSort })}
         className={CONTROL}
       >
-        {(Object.keys(SORT_LABELS) as IssueSort[]).map((sort) => (
+        {(SORT_MENU.includes(filters.sort)
+          ? SORT_MENU
+          : [...SORT_MENU, filters.sort]
+        ).map((sort) => (
           <option key={sort} value={sort}>
             {SORT_LABELS[sort]}
           </option>
@@ -209,6 +214,7 @@ export function IssueFilters({
           Clear
         </button>
       )}
+      </div>
     </div>
   );
 }

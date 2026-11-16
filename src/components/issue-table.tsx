@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useAppRouter } from "@/lib/useAppRouter";
 
@@ -8,14 +8,18 @@ import { PriorityBadge } from "@/components/issue-badges";
 import { LabelChip } from "@/components/label-chip";
 import { useConfirm } from "@/components/confirm-provider";
 import { useToday } from "@/lib/useToday";
+import { buildBoardQuery, type IssueFilterState } from "@/lib/issueFilters";
 import {
   ISSUE_STATUSES,
+  SORT_COLUMNS,
   STATUS_LABELS,
   formatDueDate,
   isOverdue,
+  sortColumnState,
   type IssueLabelView,
   type IssuePriority,
   type IssueStatus,
+  type SortColumn,
 } from "@/lib/issueMeta";
 
 interface Issue {
@@ -29,18 +33,64 @@ interface Issue {
   labels: IssueLabelView[];
 }
 
+// A column header that sorts the table: click once for the first order, again to
+// reverse it. It is a plain link, so the sort lives in the URL and paging keeps it.
+function SortHeader({
+  slug,
+  filters,
+  column,
+  className = "",
+  children,
+}: {
+  slug: string;
+  filters: IssueFilterState;
+  column: SortColumn;
+  className?: string;
+  children: ReactNode;
+}) {
+  const state = sortColumnState(filters.sort, column);
+  const { first, second } = SORT_COLUMNS[column];
+  const next = state === "first" ? second : first;
+  const label = `Sort by ${String(children).toLowerCase()}`;
+
+  return (
+    <th
+      scope="col"
+      aria-sort={
+        state === "first" ? "ascending" : state === "second" ? "descending" : "none"
+      }
+      className={`px-3 py-2 font-medium ${className}`}
+    >
+      <Link
+        href={`/${slug}/board${buildBoardQuery(filters, { sort: next, page: 1 })}`}
+        aria-label={label}
+        className={`inline-flex items-center gap-1 uppercase hover:text-foreground ${
+          state ? "text-foreground" : ""
+        }`}
+      >
+        {children}
+        <span aria-hidden="true" className={state ? "" : "opacity-30"}>
+          {state === "first" ? "▲" : state === "second" ? "▼" : "⇅"}
+        </span>
+      </Link>
+    </th>
+  );
+}
+
 export function IssueTable({
   slug,
   issues,
   assigneeNames,
   canManage,
   filtered,
+  filters,
 }: {
   slug: string;
   issues: Issue[];
   assigneeNames: Record<string, string>;
   canManage: boolean;
   filtered: boolean;
+  filters: IssueFilterState;
 }) {
   const router = useAppRouter();
   const today = useToday();
@@ -155,12 +205,24 @@ export function IssueTable({
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-black/[.06] bg-accent/[.08] text-left text-xs uppercase tracking-wide text-muted dark:border-white/[.08] dark:bg-accent/[.08]">
-              <th className="w-14 px-3 py-2 font-medium">#</th>
-              <th className="px-3 py-2 font-medium">Title</th>
-              <th className="px-3 py-2 font-medium">Status</th>
-              <th className="px-3 py-2 font-medium">Priority</th>
-              <th className="px-3 py-2 font-medium">Assignee</th>
-              <th className="px-3 py-2 font-medium">Due</th>
+              <SortHeader slug={slug} filters={filters} column="number" className="w-14">
+                #
+              </SortHeader>
+              <SortHeader slug={slug} filters={filters} column="title">
+                Title
+              </SortHeader>
+              <SortHeader slug={slug} filters={filters} column="status">
+                Status
+              </SortHeader>
+              <SortHeader slug={slug} filters={filters} column="priority">
+                Priority
+              </SortHeader>
+              <SortHeader slug={slug} filters={filters} column="assignee">
+                Assignee
+              </SortHeader>
+              <SortHeader slug={slug} filters={filters} column="due">
+                Due
+              </SortHeader>
               {canManage && (
                 <th className="px-3 py-2">
                   <span className="sr-only">Actions</span>

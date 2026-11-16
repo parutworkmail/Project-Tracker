@@ -21,11 +21,9 @@ function activeSection(pathname: string): "settings" | "board" | "my-tasks" {
 export function ProjectNav({
   slug,
   name,
-  canManage,
 }: {
   slug: string;
   name: string;
-  canManage: boolean;
 }) {
   const active = activeSection(usePathname());
   const { data: session, status } = useSession();
@@ -61,18 +59,16 @@ export function ProjectNav({
           >
             My tasks
           </Link>
-          {canManage && (
-            <Link
-              href={`/${slug}/settings`}
-              className={
-                active === "settings"
-                  ? "rounded-lg bg-accent/45 px-3 py-1.5 font-medium text-foreground dark:bg-accent/20 dark:text-accent-text"
-                  : "rounded-lg px-3 py-1.5 text-muted hover:bg-accent/12 hover:text-foreground"
-              }
-            >
-              Project Settings
-            </Link>
-          )}
+          <Link
+            href={`/${slug}/settings`}
+            className={
+              active === "settings"
+                ? "rounded-lg bg-accent/45 px-3 py-1.5 font-medium text-foreground dark:bg-accent/20 dark:text-accent-text"
+                : "rounded-lg px-3 py-1.5 text-muted hover:bg-accent/12 hover:text-foreground"
+            }
+          >
+            Project Settings
+          </Link>
         </nav>
       </div>
 

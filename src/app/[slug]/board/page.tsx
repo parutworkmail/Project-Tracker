@@ -6,7 +6,6 @@ import { prisma } from "@/lib/prisma";
 import { canManageProject, getAssignableUsers } from "@/lib/permissions";
 import { buildBoardQuery, parseIssueFilters } from "@/lib/issueFilters";
 import { IssueFilters } from "@/components/issue-filters";
-import { LeaveProjectButton } from "@/components/leave-project-button";
 import { JoinProjectButton } from "@/components/join-project-button";
 import { CreateIssueButton } from "@/components/create-issue-button";
 import { ExportCsvButton } from "@/components/export-csv-button";
@@ -79,13 +78,6 @@ export default async function ProjectBoardPage({
         <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
           <h1 className="text-xl font-semibold">Tasks</h1>
           <div className="flex items-start gap-2">
-            {membership && (
-              <LeaveProjectButton
-                slug={project.slug}
-                projectName={project.name}
-                userId={session.user.id}
-              />
-            )}
             <ExportCsvButton
               href={`/api/projects/${project.slug}/issues/export${buildBoardQuery(filters, { page: 1, view: "list" })}`}
             />
