@@ -191,6 +191,7 @@ describe("POST /api/admin/users", () => {
   });
 
   it("returns a clean 500 (not a raw crash) for non-P2002 errors", async () => {
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
     authMock.mockResolvedValue({ user: { id: "super-1", role: "SUPER_ADMIN" } });
     userCreate.mockRejectedValue(new Error("connection lost"));
 
@@ -201,6 +202,8 @@ describe("POST /api/admin/users", () => {
 
     expect(response.status).toBe(500);
     expect(typeof body.error).toBe("string");
+    expect(quiet).toHaveBeenCalled();
+    quiet.mockRestore();
   });
 
   it("creates the user with mustChangePassword true and a bcrypt hash, returns 201", async () => {

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { badgeLabel } from "@/lib/badge";
+
 export const NOTIFICATIONS_CHANGED = "notifications:changed";
 
 const POLL_MS = 60_000;
@@ -52,14 +54,15 @@ export function UnreadBadge({ slug, initial }: { slug?: string; initial?: number
 
   // A fresh server value (after a refresh or navigation) beats an older poll result.
   const count = live && live.from === initial ? live.value : (initial ?? live?.value ?? 0);
+  const label = badgeLabel(count);
 
-  if (count <= 0) return null;
+  if (!label) return null;
 
   return (
     <span
       className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 align-middle text-[11px] font-bold leading-none text-white"
     >
-      <span aria-hidden="true">{count > 9 ? "9+" : count}</span>
+      <span aria-hidden="true">{label}</span>
       <span className="sr-only">
         {count} unread {count === 1 ? "notification" : "notifications"}
       </span>

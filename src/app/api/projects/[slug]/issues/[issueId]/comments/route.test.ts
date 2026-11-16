@@ -7,6 +7,8 @@ const {
   addComment,
   getIssue,
   canAccessProject,
+  getAssignableUsers,
+  createNotifications,
 } = vi.hoisted(() => ({
   authMock: vi.fn(),
   projectFindUnique: vi.fn(),
@@ -14,6 +16,8 @@ const {
   addComment: vi.fn(),
   getIssue: vi.fn(),
   canAccessProject: vi.fn(),
+  getAssignableUsers: vi.fn(),
+  createNotifications: vi.fn(),
 }));
 
 vi.mock("@/auth", () => ({ auth: authMock }));
@@ -35,7 +39,9 @@ vi.mock("@/lib/prisma", () => ({
 
 vi.mock("@/lib/projectSchema", () => ({ listComments, addComment, getIssue }));
 
-vi.mock("@/lib/permissions", () => ({ canAccessProject }));
+vi.mock("@/lib/permissions", () => ({ canAccessProject, getAssignableUsers }));
+
+vi.mock("@/lib/notifications", () => ({ createNotifications }));
 
 import { GET, POST } from "./route";
 
@@ -69,6 +75,10 @@ beforeEach(() => {
   addComment.mockReset();
   getIssue.mockReset();
   canAccessProject.mockReset();
+  getAssignableUsers.mockReset();
+  getAssignableUsers.mockResolvedValue([]);
+  createNotifications.mockReset();
+  createNotifications.mockResolvedValue(undefined);
 });
 
 describe("GET /api/projects/[slug]/issues/[issueId]/comments", () => {
@@ -174,6 +184,61 @@ describe("POST /api/projects/[slug]/issues/[issueId]/comments", () => {
       issueId: "i1",
       authorId: "user-1",
       body: "hello",
+    });
+    expect(createNotifications).not.toHaveBeenCalled();
+  });
+
+  describe("tags", () => {
+    const people = [
+      { id: "user-1", username: "alice", name: null },
+      { id: "user-2", username: "bob", name: "Bob" },
+      { id: "user-3", username: "carol", name: null },
+    ];
+
+    function arrange() {
+      authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
+      projectFindUnique.mockResolvedValue(project);
+      canAccessProject.mockResolvedValue(true);
+      getIssue.mockResolvedValue({ id: "i1" });
+      addComment.mockResolvedValue({ id: "c1", body: "x" });
+      getAssignableUsers.mockResolvedValue(people);
+    }
+
+    it("notifies each tagged project member once, with the comment id", async () => {
+      arrange();
+
+      const response = await POST(
+        jsonRequest({ body: "hi @bob and @carol, again @bob" }),
+        params("x", "i1")
+      );
+
+      expect(response.status).toBe(201);
+      expect(getAssignableUsers).toHaveBeenCalledWith("p1");
+      expect(createNotifications).toHaveBeenCalledTimes(1);
+      expect(createNotifications).toHaveBeenCalledWith("proj_abc", [
+        { userId: "user-2", kind: "mention", issueId: "i1", actorId: "user-1", commentId: "c1" },
+        { userId: "user-3", kind: "mention", issueId: "i1", actorId: "user-1", commentId: "c1" },
+      ]);
+    });
+
+    it("ignores names that are not people in the project", async () => {
+      arrange();
+
+      await POST(jsonRequest({ body: "hi @stranger" }), params("x", "i1"));
+
+      expect(createNotifications).not.toHaveBeenCalled();
+    });
+
+    it("still posts the comment when looking up people fails", async () => {
+      arrange();
+      getAssignableUsers.mockRejectedValue(new Error("db down"));
+      const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const response = await POST(jsonRequest({ body: "hi @bob" }), params("x", "i1"));
+
+      expect(response.status).toBe(201);
+      expect(createNotifications).not.toHaveBeenCalled();
+      quiet.mockRestore();
     });
   });
 });

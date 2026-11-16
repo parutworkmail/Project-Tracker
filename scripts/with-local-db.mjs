@@ -9,14 +9,24 @@ const env = JSON.parse(
 );
 
 const [command, ...args] = process.argv.slice(2);
-const child = spawn(command, args, {
+const needsShell = ["npx", "npm"].includes(command);
+
+// A shell is needed to run npm/npx on Windows. Node warns (DEP0190) when an args
+// array is combined with a shell, so build one quoted command line instead.
+const quote = (value) => (/^[\w./:=@%+,-]+$/.test(value) ? value : `"${value.replace(/"/g, '\\"')}"`);
+
+const options = {
   stdio: "inherit",
-  shell: ["npx", "npm"].includes(command),
   env: {
     ...process.env,
     ...env,
     AUTH_SECRET: process.env.AUTH_SECRET ?? "local-test-secret",
     AUTH_TRUST_HOST: "true",
   },
-});
+};
+
+const child = needsShell
+  ? spawn([command, ...args].map(quote).join(" "), { ...options, shell: true })
+  : spawn(command, args, options);
+
 child.on("exit", (code) => process.exit(code ?? 0));

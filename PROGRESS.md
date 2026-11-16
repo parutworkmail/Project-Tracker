@@ -6,6 +6,26 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
+- **RELEASE 0.1.1 (alpha) - requested by the user: "fix Create user button, run full tests, fix every
+  bug/error/warning, push and tag 0.1.1".** Create user button now matches "+ New project"
+  (verified in a real browser, light + dark: same height, colour, radius). Admin users table: added
+  column padding and no-wrap action buttons (Name/Email were running together). Warnings removed:
+  Vitest "configLoader" + vite-tsconfig-paths notice (config is now vitest.config.mts using native
+  resolve.tsconfigPaths, dependency dropped), Node DEP0190 in scripts/with-local-db.mjs (one command
+  string instead of args + shell), expected error logs in 4 unit tests (silenced and asserted).
+  Added tests: notifications.integration.test.ts (all 13 sorts + notifications on a real DB, gated by
+  RUN_DB_INTEGRATION=1), plus badge/issueSort/notifications unit tests already in the tree.
+  FINAL GATE: tsc clean, eslint clean, 482/482 tests (456 unit + 26 DB integration), production
+  build clean with no warnings, e2e-loop 161/161, check-notifications ALL PASS, check-ui ALL PASS
+  (Create user button, sortable headers, search line, All projects link, Leave in settings, label
+  dropdown), change-password redirect verified. NOTE: when this started, the working tree already
+  held uncommitted work from another session (Create user fix, vitest config, badge.ts, 3 new test
+  files, comment route guard, package.json/lockfile); it was reviewed, kept and validated, not
+  reverted. Lockfile also re-resolved some dev-only @typescript-eslint packages (npm ci OK).
+  RELEASE_STAGE is still "alpha" (pinned by appVersion.test.ts); the earlier plan said 0.1.0 would be
+  beta, the user asked for 0.1.1, so the stage label was left alone. CHANGELOG.md created.
+- **Status**: 0.1.1 committed, tagged v0.1.1 and pushed on the user's explicit request.
+
 - **USER RULE (noted)**: when the user says "fix my feedback" they want a QUICK fix: minimal edit,
   at most one fast check on the touched file (eslint/tsc), NO full vitest, NO e2e, NO full build,
   NO starting servers or the local DB. Commit locally, short answer, never push.

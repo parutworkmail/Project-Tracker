@@ -145,6 +145,7 @@ describe("withApiErrorHandling", () => {
   });
 
   it("returns 503 with a clean message when a DB connection error is thrown", async () => {
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
     const handler = withApiErrorHandling(async () => {
       throw new DbUnavailableError("missing env var");
     });
@@ -154,9 +155,12 @@ describe("withApiErrorHandling", () => {
 
     expect(response.status).toBe(503);
     expect(typeof body.error).toBe("string");
+    expect(quiet).toHaveBeenCalled();
+    quiet.mockRestore();
   });
 
   it("returns 500 with a clean message (no raw error details) for any other error", async () => {
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
     const handler = withApiErrorHandling(async () => {
       throw new Error("some unexpected bug with a secret stack trace");
     });
@@ -167,6 +171,8 @@ describe("withApiErrorHandling", () => {
     expect(response.status).toBe(500);
     expect(typeof body.error).toBe("string");
     expect(body.error).not.toContain("secret stack trace");
+    expect(quiet).toHaveBeenCalled();
+    quiet.mockRestore();
   });
 });
 

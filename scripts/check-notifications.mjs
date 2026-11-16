@@ -150,11 +150,16 @@ try {
 
   await new Promise((r) => setTimeout(r, 2500));
   const afterOpen = await m.count(slug);
-  check("opening the task marked its notifications as read", afterOpen === 0, afterOpen);
+  check("opening the task cleared its notifications and left other tasks' ones alone", afterOpen === before.u1, `${afterOpen} vs baseline ${before.u1}`);
   await pageB.goto(`${base}/${slug}/my-tasks`, { waitUntil: "networkidle0" });
   await pageB.screenshot({ path: path.join(shots, "notifications-read.png") });
   const menuAfter = await pageB.$$eval("nav[aria-label='Project menu'] a", (as) => as.map((x) => x.textContent?.replace(/\s+/g, " ").trim()));
-  check("badge disappears once everything is read", !menuAfter.some((t) => t?.includes("My tasks") && /\d/.test(t)), JSON.stringify(menuAfter));
+  const myTasksAfter = menuAfter.find((t) => t?.startsWith("My tasks")) ?? "";
+  check(
+    "badge shows only what is still unread",
+    before.u1 === 0 ? !/\d/.test(myTasksAfter) : myTasksAfter.includes(String(before.u1)) && !myTasksAfter.includes("9+"),
+    JSON.stringify(menuAfter)
+  );
 } finally {
   await browser.close();
 }

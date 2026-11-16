@@ -32,7 +32,6 @@ if (process.argv.includes("--checks")) {
   facts.lint = lint.code === 0 ? "clean" : `exit ${lint.code}${lintErrors ? `, ${lintErrors[1]} errors` : ""}`;
 
   const tests = run("npx vitest run");
-  // eslint-disable-next-line no-control-regex
   const plain = tests.out.replace(/\x1b\[[0-9;]*m/g, "");
   const passed = /Tests\s+(?:(\d+) failed \| )?(\d+) passed(?: \| (\d+) skipped)?/.exec(plain);
   facts.unitTests = passed

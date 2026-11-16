@@ -127,16 +127,18 @@ async function handlePOST(request: Request, { params }: RouteContext) {
     const people = await getAssignableUsers(project.id);
     const mentioned = findMentionedUsers(parsed.data.body, people);
 
-    await createNotifications(
-      project.schemaName,
-      mentioned.map((user) => ({
-        userId: user.id,
-        kind: "mention" as const,
-        issueId,
-        actorId: session.user.id,
-        commentId: comment.id,
-      }))
-    );
+    if (mentioned.length > 0) {
+      await createNotifications(
+        project.schemaName,
+        mentioned.map((user) => ({
+          userId: user.id,
+          kind: "mention" as const,
+          issueId,
+          actorId: session.user.id,
+          commentId: comment.id,
+        }))
+      );
+    }
   } catch (error) {
     console.error("Could not notify mentioned people", error);
   }

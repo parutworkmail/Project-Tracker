@@ -7,6 +7,7 @@ const {
   createIssue,
   canAccessProject,
   isAssignableUser,
+  createNotifications,
 } = vi.hoisted(() => ({
   authMock: vi.fn(),
   projectFindUnique: vi.fn(),
@@ -14,6 +15,7 @@ const {
   createIssue: vi.fn(),
   canAccessProject: vi.fn(),
   isAssignableUser: vi.fn(),
+  createNotifications: vi.fn(),
 }));
 
 vi.mock("@/auth", () => ({ auth: authMock }));
@@ -45,11 +47,15 @@ vi.mock("@/lib/permissions", () => ({
   isAssignableUser,
 }));
 
+vi.mock("@/lib/notifications", () => ({ createNotifications }));
+
 import { GET, POST } from "./route";
 
 beforeEach(() => {
   enforceRateLimit.mockReset();
   enforceRateLimit.mockResolvedValue(null);
+  createNotifications.mockReset();
+  createNotifications.mockResolvedValue(undefined);
 });
 
 function params(slug: string) {
@@ -243,6 +249,21 @@ describe("POST /api/projects/[slug]/issues", () => {
       dueDate: "2027-03-01",
       assigneeId: "user-2",
     });
+    expect(createNotifications).toHaveBeenCalledWith("proj_abc", [
+      { userId: "user-2", kind: "assigned", issueId: "i1", actorId: "user-1" },
+    ]);
+  });
+
+  it("does not notify anyone when the task is created without an assignee", async () => {
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
+    projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(true);
+    createIssue.mockResolvedValue({ id: "i1" });
+
+    const response = await POST(jsonRequest({ title: "Bug" }), params("x"));
+
+    expect(response.status).toBe(201);
+    expect(createNotifications).not.toHaveBeenCalled();
   });
 
   it("rejects an assignee who is not part of the project", async () => {

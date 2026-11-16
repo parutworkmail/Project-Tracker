@@ -4,20 +4,24 @@ const {
   authMock,
   projectFindUnique,
   updateIssue,
+  getIssue,
   setIssueLabels,
   deleteIssue,
   canAccessProject,
   canManageProject,
   isAssignableUser,
+  createNotifications,
 } = vi.hoisted(() => ({
   authMock: vi.fn(),
   projectFindUnique: vi.fn(),
   updateIssue: vi.fn(),
+  getIssue: vi.fn(),
   setIssueLabels: vi.fn(),
   deleteIssue: vi.fn(),
   canAccessProject: vi.fn(),
   canManageProject: vi.fn(),
   isAssignableUser: vi.fn(),
+  createNotifications: vi.fn(),
 }));
 
 vi.mock("@/auth", () => ({ auth: authMock }));
@@ -41,6 +45,7 @@ vi.mock("@/lib/prisma", () => ({
 
 vi.mock("@/lib/projectSchema", () => ({
   updateIssue,
+  getIssue,
   deleteIssue,
   setIssueLabels,
 }));
@@ -51,11 +56,17 @@ vi.mock("@/lib/permissions", () => ({
   isAssignableUser,
 }));
 
+vi.mock("@/lib/notifications", () => ({ createNotifications }));
+
 import { DELETE, PATCH } from "./route";
 
 beforeEach(() => {
   enforceRateLimit.mockReset();
   enforceRateLimit.mockResolvedValue(null);
+  createNotifications.mockReset();
+  createNotifications.mockResolvedValue(undefined);
+  getIssue.mockReset();
+  getIssue.mockResolvedValue({ id: "i1", assignee_id: null });
 });
 
 function params(slug: string, issueId: string) {
@@ -232,6 +243,62 @@ describe("PATCH /api/projects/[slug]/issues/[issueId]", () => {
 
     expect(response.status).toBe(200);
     expect(isAssignableUser).toHaveBeenCalledWith("p1", "user-2");
+    expect(createNotifications).toHaveBeenCalledWith("proj_abc", [
+      { userId: "user-2", kind: "assigned", issueId: "i1", actorId: "user-1" },
+    ]);
+  });
+
+  it("does not notify again when the assignee did not change", async () => {
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
+    projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(true);
+    isAssignableUser.mockResolvedValue(true);
+    getIssue.mockResolvedValue({ id: "i1", assignee_id: "user-2" });
+    updateIssue.mockResolvedValue({ id: "i1" });
+
+    await PATCH(jsonRequest({ assigneeId: "user-2" }), params("x", "i1"));
+
+    expect(createNotifications).not.toHaveBeenCalled();
+  });
+
+  it("notifies the new assignee when a task is reassigned", async () => {
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
+    projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(true);
+    isAssignableUser.mockResolvedValue(true);
+    getIssue.mockResolvedValue({ id: "i1", assignee_id: "user-2" });
+    updateIssue.mockResolvedValue({ id: "i1" });
+
+    await PATCH(jsonRequest({ assigneeId: "user-3" }), params("x", "i1"));
+
+    expect(createNotifications).toHaveBeenCalledWith("proj_abc", [
+      { userId: "user-3", kind: "assigned", issueId: "i1", actorId: "user-1" },
+    ]);
+  });
+
+  it("does not notify anyone when the assignee is cleared or other fields change", async () => {
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
+    projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(true);
+    updateIssue.mockResolvedValue({ id: "i1" });
+
+    await PATCH(jsonRequest({ assigneeId: null }), params("x", "i1"));
+    await PATCH(jsonRequest({ status: "done" }), params("x", "i1"));
+
+    expect(createNotifications).not.toHaveBeenCalled();
+  });
+
+  it("does not notify when the update itself finds no task", async () => {
+    authMock.mockResolvedValue({ user: { id: "user-1", role: "USER" } });
+    projectFindUnique.mockResolvedValue(project);
+    canAccessProject.mockResolvedValue(true);
+    isAssignableUser.mockResolvedValue(true);
+    updateIssue.mockResolvedValue(null);
+
+    const response = await PATCH(jsonRequest({ assigneeId: "user-2" }), params("x", "gone"));
+
+    expect(response.status).toBe(404);
+    expect(createNotifications).not.toHaveBeenCalled();
   });
 
   it("rejects assigning to someone outside the project", async () => {

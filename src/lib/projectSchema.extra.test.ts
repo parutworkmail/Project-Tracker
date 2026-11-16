@@ -195,6 +195,44 @@ describe("searchIssues", () => {
       )
     ).toBe(true);
   });
+
+  it("orders by every column-header sort with a stable tie-break", async () => {
+    const schema = await fresh();
+    queryRawUnsafe.mockResolvedValue([{ count: 0 }]);
+
+    const expected: Record<string, string> = {
+      title_asc: "lower(title) ASC",
+      title_desc: "lower(title) DESC",
+      status_asc: "WHEN 'todo' THEN 0",
+      status_desc: "WHEN 'done' THEN 0",
+      priority_low: "WHEN 'urgent' THEN 3",
+      due_desc: "due_date DESC NULLS LAST",
+      assignee_asc: "ASC NULLS LAST",
+      assignee_desc: "DESC NULLS LAST",
+    };
+
+    for (const [sort, fragment] of Object.entries(expected)) {
+      queryRawUnsafe.mockClear();
+      queryRawUnsafe.mockResolvedValue([{ count: 0 }]);
+
+      await searchIssues(schema, { sort: sort as never });
+
+      const sql = queryRawUnsafe.mock.calls[0][0] as string;
+      expect(sql, sort).toContain(fragment);
+      expect(sql, sort).toMatch(/ORDER BY[\s\S]*id ASC\s+LIMIT/);
+    }
+  });
+
+  it("sorts by assignee name with a subquery, not a join", async () => {
+    const schema = await fresh();
+    queryRawUnsafe.mockResolvedValue([{ count: 0 }]);
+
+    await searchIssues(schema, { sort: "assignee_asc" });
+
+    const sql = queryRawUnsafe.mock.calls[0][0] as string;
+    expect(sql).toContain('FROM "public"."User" u WHERE u.id = issues.assignee_id');
+    expect(sql).not.toMatch(/\bJOIN\b.*"User"/);
+  });
 });
 
 describe("updateIssue", () => {

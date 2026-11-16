@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Collapsible } from "@/components/collapsible";
 import { LocalTime } from "@/components/local-time";
 import { MarkAllReadButton } from "@/components/mark-all-read-button";
+import { badgeLabel } from "@/lib/badge";
 import type { NotificationView } from "@/lib/notifications";
 
 const VISIBLE = 5;
@@ -71,7 +72,7 @@ export function NotificationsSection({
           Notifications
           {unread > 0 && (
             <span className="ml-2 rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold leading-none text-white">
-              {unread > 9 ? "9+" : unread} new
+              {badgeLabel(unread)} new
             </span>
           )}
         </h2>

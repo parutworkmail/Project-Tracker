@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Tool scratch files, not project code.
+    ".axet-code/**",
   ]),
 ]);
 

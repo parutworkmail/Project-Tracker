@@ -1,6 +1,6 @@
 {
   "name": "project-tracker-site",
-  "version": "0.0.1",
+  "version": "0.1.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -40,7 +40,11 @@
     "prisma": "^7.10.1",
     "tailwindcss": "^4",
     "typescript": "5.9.3",
-    "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^5.0.5"
+  },
+  "allowScripts": {
+    "@prisma/engines@7.10.1": true,
+    "prisma@7.10.1": true,
+    "unrs-resolver@1.12.2": true
   }
 }

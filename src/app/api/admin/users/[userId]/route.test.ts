@@ -294,6 +294,7 @@ describe("DELETE /api/admin/users/[userId]", () => {
   });
 
   it("returns a clean 500 (not a raw crash) for non-P2003 errors", async () => {
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
     authMock.mockResolvedValue({ user: { id: "super-1", role: "SUPER_ADMIN" } });
     userFindUnique.mockResolvedValue({ id: "user-2" });
     userDelete.mockRejectedValue(new Error("connection lost"));
@@ -306,6 +307,8 @@ describe("DELETE /api/admin/users/[userId]", () => {
 
     expect(response.status).toBe(500);
     expect(typeof body.error).toBe("string");
+    expect(quiet).toHaveBeenCalled();
+    quiet.mockRestore();
   });
 
   it("deletes the user and returns ok", async () => {

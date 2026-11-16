@@ -107,10 +107,10 @@ export function UserRoleManager({
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-zinc-500">
-            <th className="py-2">Username</th>
-            <th className="py-2">Name</th>
-            <th className="py-2">Email</th>
-            <th className="py-2">Role</th>
+            <th className="py-2 pr-4">Username</th>
+            <th className="py-2 pr-4">Name</th>
+            <th className="py-2 pr-4">Email</th>
+            <th className="py-2 pr-4">Role</th>
             <th className="py-2"></th>
           </tr>
         </thead>
@@ -120,10 +120,10 @@ export function UserRoleManager({
               key={user.id}
               className="border-t border-black/[.08] dark:border-white/[.145]"
             >
-              <td className="py-2 font-medium">{user.username}</td>
-              <td className="py-2">{user.name ?? "—"}</td>
-              <td className="py-2">{user.email ?? "—"}</td>
-              <td className="py-2">
+              <td className="py-2 pr-4 font-medium">{user.username}</td>
+              <td className="py-2 pr-4">{user.name ?? "—"}</td>
+              <td className="py-2 pr-4 break-all">{user.email ?? "—"}</td>
+              <td className="py-2 pr-4">
                 {user.id === currentUserId ? (
                   <span className="text-zinc-500">{user.role} (you)</span>
                 ) : (
@@ -144,7 +144,7 @@ export function UserRoleManager({
                   </select>
                 )}
               </td>
-              <td className="py-2 text-right">
+              <td className="py-2 text-right whitespace-nowrap">
                 <div className="flex justify-end gap-2">
                   <button
                     type="button"
