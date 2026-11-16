@@ -308,44 +308,71 @@ export function IssueDetailForm({
         </div>
       </div>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-medium">Labels</legend>
-        {availableLabels.length === 0 ? (
-          <p className="text-sm text-zinc-500">
-            This project has no labels yet. Create the first one below.
-          </p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {availableLabels.map((label) => {
-              const selected = labelIds.includes(label.id);
+      <div className="flex flex-col gap-1">
+        <span className="text-sm font-medium">Labels</span>
+        <details className="group rounded border border-black/[.08] bg-surface dark:border-white/[.145]">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm [&::-webkit-details-marker]:hidden">
+            <span className="flex flex-wrap items-center gap-1.5">
+              {labelIds.length === 0 ? (
+                <span className="text-zinc-500">No labels</span>
+              ) : (
+                availableLabels
+                  .filter((label) => labelIds.includes(label.id))
+                  .map((label) => <LabelChip key={label.id} label={label} />)
+              )}
+            </span>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              className="size-4 shrink-0 text-zinc-500 transition-transform group-open:rotate-180"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </summary>
 
-              return (
-                <button
-                  key={label.id}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => toggleLabel(label.id)}
-                  className={`rounded-full ${
-                    selected
-                      ? "ring-2 ring-foreground ring-offset-2 ring-offset-[var(--background)]"
-                      : "opacity-60 hover:opacity-100"
-                  }`}
-                >
-                  <LabelChip label={label} />
-                </button>
-              );
-            })}
+          <div className="flex flex-col gap-3 border-t border-black/[.08] px-3 py-3 dark:border-white/[.145]">
+            {availableLabels.length === 0 ? (
+              <p className="text-sm text-zinc-500">
+                This project has no labels yet. Create the first one below.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-1">
+                {availableLabels.map((label) => (
+                  <li key={label.id}>
+                    <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 hover:bg-black/[.04] dark:hover:bg-white/[.06]">
+                      <input
+                        type="checkbox"
+                        checked={labelIds.includes(label.id)}
+                        onChange={() => toggleLabel(label.id)}
+                      />
+                      <LabelChip label={label} />
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <details className="text-sm">
+              <summary className="cursor-pointer text-zinc-500 hover:underline">
+                Create a new label
+              </summary>
+              <div className="mt-2">
+                <LabelCreateForm
+                  slug={slug}
+                  onCreated={(label) => {
+                    setAvailableLabels((prev) => [...prev, label]);
+                    setLabelIds((prev) => [...prev, label.id]);
+                    setMessage(null);
+                  }}
+                />
+              </div>
+            </details>
           </div>
-        )}
-        <LabelCreateForm
-          slug={slug}
-          onCreated={(label) => {
-            setAvailableLabels((prev) => [...prev, label]);
-            setLabelIds((prev) => [...prev, label.id]);
-            setMessage(null);
-          }}
-        />
-      </fieldset>
+        </details>
+      </div>
 
       <div className="flex flex-wrap items-center gap-3">
         <ActionButton
