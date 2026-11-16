@@ -39,7 +39,12 @@ export default async function AdminPage() {
             user: { select: { id: true, username: true, name: true, email: true } },
           },
         },
-        _count: { select: { members: true } },
+        members: {
+          include: {
+            user: { select: { id: true, username: true, name: true, email: true } },
+          },
+          orderBy: { createdAt: "asc" },
+        },
       },
     }),
     prisma.projectAdmin.findMany({
@@ -92,7 +97,12 @@ export default async function AdminPage() {
               id: p.id,
               name: p.name,
               slug: p.slug,
-              memberCount: p._count.members,
+              members: p.members.map((m) => ({
+                id: m.user.id,
+                username: m.user.username,
+                name: m.user.name,
+                email: m.user.email,
+              })),
               admins: p.admins.map((a) => ({
                 id: a.user.id,
                 username: a.user.username,
@@ -101,6 +111,12 @@ export default async function AdminPage() {
               })),
             }))}
             availableAdmins={admins}
+            allUsers={users.map((u) => ({
+              id: u.id,
+              username: u.username,
+              name: u.name,
+              email: u.email,
+            }))}
           />
         </section>
 
