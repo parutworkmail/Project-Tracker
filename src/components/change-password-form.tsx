@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useAppRouter, useNavigationBusy } from "@/lib/useAppRouter";
 import { ActionButton } from "@/components/action-button";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,9 +16,8 @@ export function ChangePasswordForm({
 }: {
   redirectTo?: string;
 }) {
-  const router = useAppRouter();
-  const navigating = useNavigationBusy();
   const [formError, setFormError] = useState<string | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
 
   const {
     register,
@@ -46,8 +44,11 @@ export function ChangePasswordForm({
       return;
     }
 
-    router.push(redirectTo);
-    router.refresh();
+    // Full page load on purpose: the client router cache still holds the
+    // redirect-to-/change-password answer it got for /dashboard right after
+    // login, and a soft navigation would replay it and leave the user here.
+    setRedirecting(true);
+    window.location.assign(redirectTo);
   }
 
   return (
@@ -99,7 +100,7 @@ export function ChangePasswordForm({
 
       <ActionButton
         type="submit"
-        pending={isSubmitting || navigating}
+        pending={isSubmitting || redirecting}
         pendingLabel="Saving..."
         className="rounded bg-foreground px-4 py-2 text-background"
       >

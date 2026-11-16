@@ -6,6 +6,16 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
+- **USER FEEDBACK FIXED (change password stayed on the page)**: a user forced to change their
+  password submitted the form, the password WAS saved, but the browser stayed on /change-password.
+  Cause: right after login the client router cache stored the answer for /dashboard (a redirect to
+  /change-password); router.push("/dashboard") replayed that cached redirect. API-level tests could
+  not see it. Fix: src/components/change-password-form.tsx now does a full page load
+  (window.location.assign) after success and keeps the button busy meanwhile. Reproduced and
+  verified in a real browser with scripts/browser-change-password.mjs (before: stays on
+  /change-password; after: lands on /dashboard, survives reload). tsc + eslint clean.
+- **Status**: Monday finished + this fix; next is Tuesday (review findings + typed-name delete in Settings).
+
 - **MONDAY DONE (end-to-end loop + browser check)**: scripts/e2e-loop.mjs (161 checks, ALL PASS on
   the local test DB: 3 roles + extra user, forced password change, projects, member/admin
   assignment, labels, tasks, comments, filters, kanban, CSV incl. formula-injection, my-tasks,
