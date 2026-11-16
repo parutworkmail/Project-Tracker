@@ -104,17 +104,39 @@ export function IssueComments({
 
   return (
     <section aria-labelledby="comments-heading">
-      <h2 id="comments-heading" className="mb-3 text-lg font-semibold">
-        Comments{" "}
-        <span className="text-sm font-normal text-zinc-500">
-          ({comments.length})
-        </span>
+      <h2 id="comments-heading" className="sr-only">
+        Comments ({comments.length})
       </h2>
 
+      <form onSubmit={handleAdd} className="mb-4 flex flex-col gap-2" noValidate>
+        <label htmlFor="new-comment" className="sr-only">
+          Add a comment
+        </label>
+        <textarea
+          id="new-comment"
+          rows={2}
+          maxLength={2000}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Add a comment…"
+          className="rounded border border-black/[.08] bg-surface px-3 py-2 text-sm dark:border-white/[.145]"
+        />
+        {error && (
+          <p role="alert" className="text-sm text-red-600">
+            {error}
+          </p>
+        )}
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-fit rounded bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
+        >
+          {submitting ? "Posting…" : "Post comment"}
+        </button>
+      </form>
+
       {comments.length === 0 ? (
-        <p className="mb-4 text-sm text-zinc-500">
-          No comments yet. Start the discussion below.
-        </p>
+        <p className="text-sm text-zinc-500">No comments yet.</p>
       ) : (
         <ul className="mb-4 flex flex-col gap-3">
           {comments.map((comment) => (
@@ -149,33 +171,6 @@ export function IssueComments({
           ))}
         </ul>
       )}
-
-      <form onSubmit={handleAdd} className="flex flex-col gap-2" noValidate>
-        <label htmlFor="new-comment" className="sr-only">
-          Add a comment
-        </label>
-        <textarea
-          id="new-comment"
-          rows={3}
-          maxLength={2000}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="Add a comment…"
-          className="rounded border border-black/[.08] bg-surface px-3 py-2 text-sm dark:border-white/[.145]"
-        />
-        {error && (
-          <p role="alert" className="text-sm text-red-600">
-            {error}
-          </p>
-        )}
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-fit rounded bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
-        >
-          {submitting ? "Posting…" : "Post comment"}
-        </button>
-      </form>
     </section>
   );
 }

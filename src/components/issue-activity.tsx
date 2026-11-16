@@ -10,7 +10,7 @@ export interface ActivityView {
 export function IssueActivity({ items }: { items: ActivityView[] }) {
   return (
     <section aria-labelledby="activity-heading">
-      <h2 id="activity-heading" className="mb-3 text-lg font-semibold">
+      <h2 id="activity-heading" className="sr-only">
         Activity
       </h2>
 

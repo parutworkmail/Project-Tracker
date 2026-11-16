@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useAppRouter, useNavigationBusy } from "@/lib/useAppRouter";
 import { ActionButton } from "@/components/action-button";
 import { useConfirm } from "@/components/confirm-provider";
+import { InlineEdit } from "@/components/inline-edit";
 
 import { Collapsible } from "@/components/collapsible";
 import { LabelChip } from "@/components/label-chip";
@@ -46,6 +47,7 @@ export function IssueDetailForm({
   projectLabels,
   formerAssigneeLabel,
   canManage,
+  children,
 }: {
   slug: string;
   issue: IssueValues;
@@ -53,6 +55,7 @@ export function IssueDetailForm({
   projectLabels: IssueLabelView[];
   formerAssigneeLabel: string | null;
   canManage: boolean;
+  children?: ReactNode;
 }) {
   const router = useAppRouter();
   const navigating = useNavigationBusy();
@@ -98,8 +101,7 @@ export function IssueDetailForm({
     dueDate !== (issue.due_date ?? "") ||
     assigneeId !== (issue.assignee_id ?? "");
 
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSave() {
     setMessage(null);
 
     if (!title.trim()) {
@@ -193,37 +195,36 @@ export function IssueDetailForm({
     !issue.assignee_id || assignees.some((u) => u.id === issue.assignee_id);
 
   return (
-    <form onSubmit={handleSave} className="flex flex-col gap-4" noValidate>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="detail-title" className="text-sm font-medium">
-          Title
-        </label>
-        <input
-          id="detail-title"
-          type="text"
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_17rem]">
+      <div className="flex min-w-0 flex-col gap-3">
+        <InlineEdit
+          label="Title"
           value={title}
+          onChange={edit(setTitle)}
           maxLength={200}
-          onChange={(e) => edit(setTitle)(e.target.value)}
-          className={`${FIELD} text-base font-medium`}
+          placeholder="Add a title"
+          displayClassName="text-2xl font-semibold"
+          inputClassName="text-2xl font-semibold"
         />
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <label htmlFor="detail-description" className="text-sm font-medium">
-          Description
-        </label>
-        <textarea
-          id="detail-description"
-          rows={6}
-          maxLength={2000}
+        <InlineEdit
+          label="Description"
+          multiline
           value={description}
-          onChange={(e) => edit(setDescription)(e.target.value)}
-          placeholder="Add more detail…"
-          className={FIELD}
+          onChange={edit(setDescription)}
+          maxLength={2000}
+          placeholder="Add a description…"
+          displayClassName="max-h-52 overflow-y-auto text-sm"
         />
+        {isDirty && (
+          <p className="text-xs text-zinc-500">
+            Unsaved changes. Press Save changes on the right.
+          </p>
+        )}
+        {children}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <aside className="flex flex-col gap-4 lg:sticky lg:top-28 lg:self-start">
+      <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
           <label htmlFor="detail-status" className="text-sm font-medium">
             Status
@@ -360,7 +361,7 @@ export function IssueDetailForm({
 
       <div className="flex flex-wrap items-center gap-3">
         <ActionButton
-          type="submit"
+          onClick={handleSave}
           pending={saving || navigating}
           pendingLabel="Saving…"
           disabled={!isDirty}
@@ -394,6 +395,7 @@ export function IssueDetailForm({
           </p>
         )}
       </div>
-    </form>
+      </aside>
+    </div>
   );
 }
