@@ -73,6 +73,12 @@ export function ProjectNav({
       </div>
 
       <div className="flex items-center gap-2 text-sm">
+        <Link
+          href="/dashboard"
+          className="rounded-lg px-3 py-1.5 text-muted hover:bg-accent/12 hover:text-foreground"
+        >
+          All projects
+        </Link>
         <ThemeToggle />
         {status === "authenticated" && (
           <>
