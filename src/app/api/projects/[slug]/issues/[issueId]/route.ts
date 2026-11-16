@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { updateIssue, deleteIssue, setIssueLabels } from "@/lib/projectSchema";
+import {
+  updateIssue,
+  deleteIssue,
+  getIssue,
+  setIssueLabels,
+} from "@/lib/projectSchema";
+import { createNotifications } from "@/lib/notifications";
 import { updateIssueSchema } from "@/lib/validation/project";
 import {
   canAccessProject,
@@ -112,6 +118,16 @@ async function handlePATCH(
     }
   }
 
+  let previousAssignee: string | null | undefined;
+
+  if (normalizedAssignee) {
+    try {
+      previousAssignee = (await getIssue(project.schemaName, issueId))?.assignee_id;
+    } catch {
+      previousAssignee = undefined;
+    }
+  }
+
   const issue = await updateIssue(
     project.schemaName,
     issueId,
@@ -128,6 +144,17 @@ async function handlePATCH(
 
   if (!issue) {
     return NextResponse.json({ error: "Issue not found" }, { status: 404 });
+  }
+
+  if (normalizedAssignee && normalizedAssignee !== previousAssignee) {
+    await createNotifications(project.schemaName, [
+      {
+        userId: normalizedAssignee,
+        kind: "assigned",
+        issueId,
+        actorId: session.user.id,
+      },
+    ]);
   }
 
   return NextResponse.json(issue);

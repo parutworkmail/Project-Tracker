@@ -8,6 +8,7 @@ import { useSession } from "next-auth/react";
 import { Avatar } from "@/components/avatar";
 import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { UnreadBadge } from "@/components/unread-badge";
 
 const DB_RECHECK_MS = 8000;
 
@@ -78,6 +79,7 @@ export function Nav() {
             <nav aria-label="Main menu" className="flex items-center gap-1 text-sm">
               <Link href="/my-tasks" className={menuLinkClass(pathname === "/my-tasks")}>
                 My tasks
+                <UnreadBadge />
               </Link>
               {isSuperAdmin && (
                 <>

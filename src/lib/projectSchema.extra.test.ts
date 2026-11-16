@@ -86,7 +86,7 @@ describe("ensureProjectSchema", () => {
       executeRawUnsafe.mock.calls.filter((c) =>
         String(c[0]).includes("CREATE TABLE IF NOT EXISTS")
       ).length
-    ).toBe(5);
+    ).toBe(6);
   });
 
   it("skips ALTER when the columns already exist", async () => {

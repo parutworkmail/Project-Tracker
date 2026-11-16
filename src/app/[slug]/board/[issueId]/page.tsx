@@ -10,6 +10,8 @@ import { IssueDetailForm } from "@/components/issue-detail-form";
 import { IssueComments } from "@/components/issue-comments";
 import { IssueActivity } from "@/components/issue-activity";
 import { IssueTabs } from "@/components/issue-tabs";
+import { MarkIssueRead } from "@/components/mark-issue-read";
+import { countUnreadForIssue } from "@/lib/notifications";
 import { LocalTime } from "@/components/local-time";
 
 export const instant = false;
@@ -58,11 +60,12 @@ export default async function IssueDetailPage({
     notFound();
   }
 
-  const [comments, assignees, activity, projectLabels] = await Promise.all([
+  const [comments, assignees, activity, projectLabels, unreadHere] = await Promise.all([
     listComments(project.schemaName, issueId),
     getAssignableUsers(project.id),
     listActivity(project.schemaName, issueId),
     listLabels(project.schemaName),
+    countUnreadForIssue(project.schemaName, session.user.id, issueId).catch(() => 0),
   ]);
 
   const userIds = [
@@ -96,6 +99,8 @@ export default async function IssueDetailPage({
             ← Back to tasks
           </Link>
         </div>
+
+        {unreadHere > 0 && <MarkIssueRead slug={project.slug} issueId={issue.id} />}
 
         <p className="mb-4 text-xs text-zinc-500">
           <span className="font-semibold text-foreground">#{issue.number}</span>
@@ -132,6 +137,7 @@ export default async function IssueDetailPage({
                 issueId={issue.id}
                 currentUserId={session.user.id}
                 canManage={canManage}
+                people={assignees}
                 comments={comments.map((comment) => ({
                   id: comment.id,
                   authorId: comment.author_id,

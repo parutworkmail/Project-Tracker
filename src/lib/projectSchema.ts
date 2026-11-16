@@ -51,7 +51,7 @@ export function generateSchemaName(): string {
   return `proj_${randomUUID().replace(/-/g, "")}`;
 }
 
-function assertValidSchemaName(schemaName: string): void {
+export function assertValidSchemaName(schemaName: string): void {
   if (!SCHEMA_NAME_PATTERN.test(schemaName)) {
     throw new Error(`Invalid schema name: ${schemaName}`);
   }
@@ -224,6 +224,23 @@ async function runEnsure(schemaName: string): Promise<void> {
 
   await prisma.$executeRawUnsafe(
     `CREATE INDEX IF NOT EXISTS issue_labels_label_idx ON "${schemaName}"."issue_labels" (label_id)`
+  );
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "${schemaName}"."notifications" (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      kind TEXT NOT NULL CHECK (kind IN ('mention', 'assigned')),
+      issue_id TEXT NOT NULL REFERENCES "${schemaName}"."issues"(id) ON DELETE CASCADE,
+      comment_id TEXT,
+      actor_id TEXT,
+      read_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+
+  await prisma.$executeRawUnsafe(
+    `CREATE INDEX IF NOT EXISTS notifications_user_idx ON "${schemaName}"."notifications" (user_id, read_at, created_at DESC)`
   );
 }
 

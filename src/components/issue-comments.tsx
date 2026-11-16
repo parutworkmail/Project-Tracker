@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAppRouter } from "@/lib/useAppRouter";
 
 import { LocalTime } from "@/components/local-time";
 import { useConfirm } from "@/components/confirm-provider";
+import { splitMentions, type MentionUser } from "@/lib/mentions";
 
 interface CommentView {
   id: string;
@@ -14,27 +15,94 @@ interface CommentView {
   createdAt: string;
 }
 
+const OPEN_MENTION = /(?<![\w@.-])@([a-zA-Z0-9_.-]{0,32})$/;
+const MAX_SUGGESTIONS = 6;
+
 export function IssueComments({
   slug,
   issueId,
   comments,
   currentUserId,
   canManage,
+  people,
 }: {
   slug: string;
   issueId: string;
   comments: CommentView[];
   currentUserId: string;
   canManage: boolean;
+  people: MentionUser[];
 }) {
   const router = useAppRouter();
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [suggest, setSuggest] = useState<{ start: number; query: string } | null>(null);
+  const [active, setActive] = useState(0);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const confirm = useConfirm();
 
   const base = `/api/projects/${slug}/issues/${issueId}/comments`;
+
+  const matches = suggest
+    ? people
+        .filter((user) =>
+          `${user.username} ${user.name ?? ""}`
+            .toLowerCase()
+            .includes(suggest.query.toLowerCase())
+        )
+        .sort((a, b) => {
+          const query = suggest.query.toLowerCase();
+          const aStarts = a.username.toLowerCase().startsWith(query) ? 0 : 1;
+          const bStarts = b.username.toLowerCase().startsWith(query) ? 0 : 1;
+          return aStarts - bStarts || a.username.localeCompare(b.username);
+        })
+        .slice(0, MAX_SUGGESTIONS)
+    : [];
+  const open = matches.length > 0;
+
+  // Opens the people list while the cursor sits right after "@something".
+  function updateSuggest(value: string, caret: number) {
+    const found = OPEN_MENTION.exec(value.slice(0, caret));
+    setSuggest(found ? { start: caret - found[0].length, query: found[1] } : null);
+    setActive(0);
+  }
+
+  function pick(user: MentionUser) {
+    const textarea = textareaRef.current;
+    if (!suggest || !textarea) return;
+
+    const caret = textarea.selectionStart;
+    const before = body.slice(0, suggest.start);
+    const inserted = `@${user.username} `;
+    const position = before.length + inserted.length;
+
+    setBody(before + inserted + body.slice(caret));
+    setSuggest(null);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(position, position);
+    });
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (!open) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActive((index) => (index + 1) % matches.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActive((index) => (index - 1 + matches.length) % matches.length);
+    } else if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      pick(matches[active] ?? matches[0]);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setSuggest(null);
+    }
+  }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -112,15 +180,58 @@ export function IssueComments({
         <label htmlFor="new-comment" className="sr-only">
           Add a comment
         </label>
-        <textarea
-          id="new-comment"
-          rows={2}
-          maxLength={2000}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="Add a comment…"
-          className="rounded border border-black/[.08] bg-surface px-3 py-2 text-sm dark:border-white/[.145]"
-        />
+        <div className="relative">
+          <textarea
+            ref={textareaRef}
+            id="new-comment"
+            rows={2}
+            maxLength={2000}
+            value={body}
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={open}
+            aria-controls="mention-list"
+            aria-activedescendant={open ? `mention-option-${active}` : undefined}
+            onChange={(e) => {
+              setBody(e.target.value);
+              updateSuggest(e.target.value, e.target.selectionStart);
+            }}
+            onKeyDown={handleKeyDown}
+            onBlur={() => setSuggest(null)}
+            placeholder="Add a comment… type @ to tag someone"
+            className="w-full rounded border border-black/[.08] bg-surface px-3 py-2 text-sm dark:border-white/[.145]"
+          />
+          {open && (
+            <ul
+              id="mention-list"
+              role="listbox"
+              aria-label="People you can tag"
+              className="absolute left-0 top-full z-20 mt-1 max-h-56 w-72 max-w-full overflow-y-auto rounded-lg border border-black/[.08] bg-surface py-1 shadow-lg dark:border-white/[.145]"
+            >
+              {matches.map((user, index) => (
+                <li
+                  key={user.id}
+                  id={`mention-option-${index}`}
+                  role="option"
+                  aria-selected={index === active}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    pick(user);
+                  }}
+                  onMouseEnter={() => setActive(index)}
+                  className={`cursor-pointer px-3 py-1.5 text-sm ${
+                    index === active ? "bg-accent/25" : ""
+                  }`}
+                >
+                  <span className="font-medium">{user.name ?? user.username}</span>
+                  {user.name && (
+                    <span className="ml-2 text-xs text-zinc-500">@{user.username}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         {error && (
           <p role="alert" className="text-sm text-red-600">
             {error}
@@ -165,7 +276,19 @@ export function IssueComments({
                 )}
               </div>
               <p className="whitespace-pre-wrap break-words text-sm">
-                {comment.body}
+                {splitMentions(comment.body, people).map((part, index) =>
+                  part.user ? (
+                    <span
+                      key={index}
+                      title={part.user.name ?? part.user.username}
+                      className="rounded bg-accent/30 px-1 font-medium"
+                    >
+                      {part.text}
+                    </span>
+                  ) : (
+                    <span key={index}>{part.text}</span>
+                  )
+                )}
               </p>
             </li>
           ))}

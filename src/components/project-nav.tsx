@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react";
 import { Avatar } from "@/components/avatar";
 import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { UnreadBadge } from "@/components/unread-badge";
 
 // Which part of the project is open, read from the address so this component can
 // live in a shared layout and keep its state while the page underneath changes.
@@ -21,9 +22,11 @@ function activeSection(pathname: string): "settings" | "board" | "my-tasks" {
 export function ProjectNav({
   slug,
   name,
+  unread,
 }: {
   slug: string;
   name: string;
+  unread: number;
 }) {
   const active = activeSection(usePathname());
   const { data: session, status } = useSession();
@@ -58,6 +61,7 @@ export function ProjectNav({
             }
           >
             My tasks
+            <UnreadBadge slug={slug} initial={unread} />
           </Link>
           <Link
             href={`/${slug}/settings`}

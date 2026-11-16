@@ -5,7 +5,9 @@ import type { GlobalRole } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { addComment, getIssue, listComments } from "@/lib/projectSchema";
 import { createCommentSchema } from "@/lib/validation/project";
-import { canAccessProject } from "@/lib/permissions";
+import { canAccessProject, getAssignableUsers } from "@/lib/permissions";
+import { findMentionedUsers } from "@/lib/mentions";
+import { createNotifications } from "@/lib/notifications";
 import { withApiErrorHandling } from "@/lib/apiError";
 import { enforceRateLimit, MINUTE } from "@/lib/enforceRateLimit";
 
@@ -119,6 +121,24 @@ async function handlePOST(request: Request, { params }: RouteContext) {
 
   if (!comment) {
     return NextResponse.json({ error: "Issue not found" }, { status: 404 });
+  }
+
+  try {
+    const people = await getAssignableUsers(project.id);
+    const mentioned = findMentionedUsers(parsed.data.body, people);
+
+    await createNotifications(
+      project.schemaName,
+      mentioned.map((user) => ({
+        userId: user.id,
+        kind: "mention" as const,
+        issueId,
+        actorId: session.user.id,
+        commentId: comment.id,
+      }))
+    );
+  } catch (error) {
+    console.error("Could not notify mentioned people", error);
   }
 
   return NextResponse.json(comment, { status: 201 });

@@ -8,6 +8,8 @@ import { listOpenIssuesAssignedTo, MY_TASKS_PER_PROJECT } from "@/lib/projectSch
 import { formatDueDate, STATUS_LABELS } from "@/lib/issueMeta";
 import { PriorityBadge } from "@/components/issue-badges";
 import { LabelChip } from "@/components/label-chip";
+import { NotificationsSection } from "@/components/notifications-section";
+import { listNotificationViews } from "@/lib/notifications";
 
 export const instant = false;
 
@@ -47,7 +49,13 @@ export default async function ProjectMyTasksPage({
     redirect(`/${slug}/board`);
   }
 
-  const issues = await listOpenIssuesAssignedTo(project.schemaName, session.user.id);
+  const [issues, notifications] = await Promise.all([
+    listOpenIssuesAssignedTo(project.schemaName, session.user.id),
+    listNotificationViews(
+      [{ slug: project.slug, name: project.name, schemaName: project.schemaName }],
+      session.user.id
+    ).catch(() => []),
+  ]);
 
   // Today in the server's calendar; the board flags overdue in the browser's.
   const today = new Date().toISOString().slice(0, 10);
@@ -61,8 +69,12 @@ export default async function ProjectMyTasksPage({
           {issues.length > 0 && ` (${issues.length}${issues.length >= MY_TASKS_PER_PROJECT ? "+" : ""})`}.
         </p>
 
+        <NotificationsSection items={notifications} slug={project.slug} />
+
+        <h2 className="mt-8 text-sm font-semibold">Tasks</h2>
+
         {issues.length === 0 ? (
-          <div className="surface mt-8 rounded-2xl p-8 text-center">
+          <div className="surface mt-2 rounded-2xl p-8 text-center">
             <p className="font-medium">Nothing assigned to you in this project.</p>
             <p className="mt-1 text-sm text-muted">
               Tasks assigned to you will show up here.
@@ -75,7 +87,7 @@ export default async function ProjectMyTasksPage({
             </Link>
           </div>
         ) : (
-          <ul className="surface mt-6 divide-y divide-black/[.06] overflow-hidden rounded-2xl dark:divide-white/[.08]">
+          <ul className="surface mt-2 divide-y divide-black/[.06] overflow-hidden rounded-2xl dark:divide-white/[.08]">
             {issues.map((issue) => {
               const overdue = !!issue.due_date && issue.due_date < today;
 

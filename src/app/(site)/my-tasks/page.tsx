@@ -2,19 +2,18 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import {
   listOpenIssuesAssignedTo,
   MY_TASKS_PER_PROJECT,
   type AssignedIssue,
 } from "@/lib/projectSchema";
+import { listNotificationViews, listUserProjects } from "@/lib/notifications";
+import { NotificationsSection } from "@/components/notifications-section";
 import { PriorityBadge } from "@/components/issue-badges";
 import { LabelChip } from "@/components/label-chip";
 import { formatDueDate, STATUS_LABELS } from "@/lib/issueMeta";
 
 export const instant = false;
-
-const MAX_PROJECTS = 50;
 
 interface ProjectGroup {
   slug: string;
@@ -35,21 +34,17 @@ export default async function MyTasksPage() {
 
   const userId = session.user.id;
 
-  const projects = await prisma.project.findMany({
-    where: {
-      OR: [{ members: { some: { userId } } }, { admins: { some: { userId } } }],
-    },
-    orderBy: { name: "asc" },
-    take: MAX_PROJECTS,
-    select: { slug: true, name: true, schemaName: true },
-  });
+  const projects = await listUserProjects(userId);
 
   // One broken project must not hide the tasks from all the others.
-  const settled = await Promise.allSettled(
-    projects.map((project) =>
-      listOpenIssuesAssignedTo(project.schemaName, userId)
-    )
-  );
+  const [settled, notifications] = await Promise.all([
+    Promise.allSettled(
+      projects.map((project) =>
+        listOpenIssuesAssignedTo(project.schemaName, userId)
+      )
+    ),
+    listNotificationViews(projects, userId).catch(() => []),
+  ]);
 
   const groups: ProjectGroup[] = [];
   let failed = 0;
@@ -82,6 +77,10 @@ export default async function MyTasksPage() {
           {totalTasks > 0 && ` (${totalTasks})`}.
         </p>
 
+        <NotificationsSection items={notifications} showProject />
+
+        <h2 className="mt-8 text-sm font-semibold">Tasks</h2>
+
         {failed > 0 && (
           <p role="alert" className="mt-4 text-sm text-red-600">
             {failed === 1
@@ -91,7 +90,7 @@ export default async function MyTasksPage() {
         )}
 
         {groups.length === 0 ? (
-          <div className="surface mt-8 rounded-2xl p-8 text-center">
+          <div className="surface mt-2 rounded-2xl p-8 text-center">
             <p className="font-medium">Nothing assigned to you right now.</p>
             <p className="mt-1 text-sm text-muted">
               Tasks assigned to you will show up here.
@@ -104,7 +103,7 @@ export default async function MyTasksPage() {
             </Link>
           </div>
         ) : (
-          <div className="mt-6 flex flex-col gap-6">
+          <div className="mt-2 flex flex-col gap-6">
             {groups.map((group) => (
               <section key={group.slug} aria-label={group.name}>
                 <h2 className="mb-2 flex items-baseline justify-between text-sm font-semibold">

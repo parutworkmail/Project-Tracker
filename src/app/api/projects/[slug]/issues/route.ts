@@ -7,6 +7,7 @@ import { createIssueSchema } from "@/lib/validation/project";
 import { canAccessProject, isAssignableUser } from "@/lib/permissions";
 import { withApiErrorHandling } from "@/lib/apiError";
 import { enforceRateLimit, MINUTE } from "@/lib/enforceRateLimit";
+import { createNotifications } from "@/lib/notifications";
 
 async function getMembership(slug: string, userId: string) {
   const project = await prisma.project.findUnique({
@@ -135,6 +136,17 @@ async function handlePOST(
       parsed.data.labelIds,
       session.user.id
     );
+  }
+
+  if (assigneeId) {
+    await createNotifications(project.schemaName, [
+      {
+        userId: assigneeId,
+        kind: "assigned",
+        issueId: issue.id,
+        actorId: session.user.id,
+      },
+    ]);
   }
 
   return NextResponse.json(issue, { status: 201 });

@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { canManageProject } from "@/lib/permissions";
 import { ProjectNav } from "@/components/project-nav";
+import { countUnread } from "@/lib/notifications";
 
 // The project navbar lives here, not in each page, so it stays on screen while
 // you move between a project's board, My tasks, Project Settings and task pages
@@ -19,7 +20,13 @@ async function ProjectNavLoader({ params }: { params: Promise<{ slug: string }> 
 
   const project = await prisma.project.findUnique({
     where: { slug },
-    select: { id: true, name: true, slug: true, members: { select: { userId: true } } },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      schemaName: true,
+      members: { select: { userId: true } },
+    },
   });
 
   if (!project) {
@@ -34,7 +41,15 @@ async function ProjectNavLoader({ params }: { params: Promise<{ slug: string }> 
     return null;
   }
 
-  return <ProjectNav slug={project.slug} name={project.name} />;
+  let unread = 0;
+
+  try {
+    unread = await countUnread(project.schemaName, session.user.id);
+  } catch {
+    unread = 0;
+  }
+
+  return <ProjectNav slug={project.slug} name={project.name} unread={unread} />;
 }
 
 function ProjectNavSkeleton() {
