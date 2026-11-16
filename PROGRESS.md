@@ -6,6 +6,9 @@ Read this file first in any new session to see what's done and what's next.
 (Read this FIRST on every session start — see CLAUDE.md "Crash-Safe Task
 Logging". Shows exactly what was happening if the last session crashed.)
 
+- **USER RULE (noted)**: when the user says "fix my feedback" they want a QUICK fix: minimal edit,
+  at most one fast check on the touched file (eslint/tsc), NO full vitest, NO e2e, NO full build,
+  NO starting servers or the local DB. Commit locally, short answer, never push.
 - **USER FEEDBACK FIXED (change password stayed on the page)**: a user forced to change their
   password submitted the form, the password WAS saved, but the browser stayed on /change-password.
   Cause: right after login the client router cache stored the answer for /dashboard (a redirect to
