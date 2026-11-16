@@ -5,6 +5,7 @@ import { useAppRouter, useNavigationBusy } from "@/lib/useAppRouter";
 import { ActionButton } from "@/components/action-button";
 import { useConfirm } from "@/components/confirm-provider";
 
+import { Collapsible } from "@/components/collapsible";
 import { LabelChip } from "@/components/label-chip";
 import { LabelCreateForm } from "@/components/label-create-form";
 import {
@@ -310,30 +311,18 @@ export function IssueDetailForm({
 
       <div className="flex flex-col gap-1">
         <span className="text-sm font-medium">Labels</span>
-        <details className="group rounded border border-black/[.08] bg-surface dark:border-white/[.145]">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm [&::-webkit-details-marker]:hidden">
-            <span className="flex flex-wrap items-center gap-1.5">
-              {labelIds.length === 0 ? (
-                <span className="text-zinc-500">No labels</span>
-              ) : (
-                availableLabels
-                  .filter((label) => labelIds.includes(label.id))
-                  .map((label) => <LabelChip key={label.id} label={label} />)
-              )}
-            </span>
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 20 20"
-              className="size-4 shrink-0 text-zinc-500 transition-transform group-open:rotate-180"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </summary>
-
-          <div className="flex flex-col gap-3 border-t border-black/[.08] px-3 py-3 dark:border-white/[.145]">
+        <Collapsible
+          summary={
+            labelIds.length === 0 ? (
+              <span className="text-zinc-500">No labels</span>
+            ) : (
+              availableLabels
+                .filter((label) => labelIds.includes(label.id))
+                .map((label) => <LabelChip key={label.id} label={label} />)
+            )
+          }
+        >
+          <div className="flex flex-col gap-3">
             {availableLabels.length === 0 ? (
               <p className="text-sm text-zinc-500">
                 This project has no labels yet. Create the first one below.
@@ -355,23 +344,18 @@ export function IssueDetailForm({
               </ul>
             )}
 
-            <details className="text-sm">
-              <summary className="cursor-pointer text-zinc-500 hover:underline">
-                Create a new label
-              </summary>
-              <div className="mt-2">
-                <LabelCreateForm
-                  slug={slug}
-                  onCreated={(label) => {
-                    setAvailableLabels((prev) => [...prev, label]);
-                    setLabelIds((prev) => [...prev, label.id]);
-                    setMessage(null);
-                  }}
-                />
-              </div>
-            </details>
+            <Collapsible variant="plain" summary="Create a new label">
+              <LabelCreateForm
+                slug={slug}
+                onCreated={(label) => {
+                  setAvailableLabels((prev) => [...prev, label]);
+                  setLabelIds((prev) => [...prev, label.id]);
+                  setMessage(null);
+                }}
+              />
+            </Collapsible>
           </div>
-        </details>
+        </Collapsible>
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
